@@ -9,6 +9,26 @@ from typing import List, Dict, Optional
 import fitz  # PyMuPDF for PDF reading
 import markdown  # For Markdown parsing
 
+class Document:
+    """Represents a single document with its content and metadata."""
+
+    def __init__(self, id: str, metadata: Dict, text: str):
+        """
+        Initializes a Document object.
+
+        Args:
+            id (str): A unique identifier for the document.
+            metadata (Dict): A dictionary containing metadata about the document.
+            text (str): The content of the document.
+        """
+        self.id = id
+        self.metadata = metadata
+        self.text = text
+
+    def __repr__(self):
+        return f"Document(id='{self.id}', metadata={self.metadata}, text='{self.text[:20]}...')"
+
+
 class FileLoader:
     """
     A class for loading and reading files from a directory.
