@@ -65,21 +65,37 @@ class FileLoader:
         else:
             raise ValueError(f"Unsupported file type: {mime_type}")
 
-    def read_pdf(self, file_path: Path) -> str:
-        """Reads the text content of a PDF file.
+    def read_pdf(self, file_path: Path) -> List[Document]:
+        """Reads the text content of a PDF file, returning a list of documents for each page.
 
         Args:
             file_path (Path): The path to the PDF file.
 
         Returns:
-            str: The extracted text from the PDF.
+            List[Document]: A list of Document objects, one for each page in the PDF.
         """
+        documents = []
         doc = fitz.open(str(file_path))
-        text = ""
-        for page in doc:
-            text += page.get_text()
+        file_stats = os.stat(file_path)
+        file_size = file_stats.st_size
+        creation_date = datetime.datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d')
+        last_modified_date = datetime.datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d')
+        for page_num, page in enumerate(doc):
+            page_label = str(page_num + 1)
+            text = page.get_text()
+            metadata = {
+                'page_label': page_label,
+                'file_name': file_path.name,
+                'file_path': str(file_path),
+                'file_type': 'application/pdf',
+                'file_size': file_size,
+                'creation_date': creation_date,
+                'last_modified_date': last_modified_date
+            }
+            document_id = str(uuid.uuid4())
+            documents.append(Document(document_id, metadata, text))
         doc.close()
-        return text
+        return documents
 
     def read_markdown(self, file_path: Path) -> str:
         """Reads and parses the content of a Markdown file.
