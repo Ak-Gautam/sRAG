@@ -1,13 +1,16 @@
 # WIP
-# Code to load load pdf or md file as text for later use
+# Code to load pdf or md file as text for later use
 
 import os
 import mimetypes
 from pathlib import Path
 from typing import List, Dict, Optional
+import uuid
+import datetime
 
 import fitz  # PyMuPDF for PDF reading
 import markdown  # For Markdown parsing
+
 
 class Document:
     """Represents a single document with its content and metadata."""
@@ -31,7 +34,8 @@ class Document:
 
 class FileLoader:
     """
-    A class for loading and reading files from a directory.
+    A class for loading and reading files from a directory,
+    returning documents with metadata and text content.
     """
 
     def __init__(self, directory_path: str, encoding: str = "utf-8"):
@@ -97,37 +101,67 @@ class FileLoader:
         doc.close()
         return documents
 
-    def read_markdown(self, file_path: Path) -> str:
+    def read_markdown(self, file_path: Path) -> Document:
         """Reads and parses the content of a Markdown file.
 
         Args:
             file_path (Path): The path to the Markdown file.
 
         Returns:
-            str: The parsed Markdown text.
+            Document: A Document object containing the parsed Markdown text.
         """
         with open(file_path, encoding=self.encoding) as f:
             md_content = f.read()
-        return markdown.markdown(md_content)
+        text = markdown.markdown(md_content)
+        file_stats = os.stat(file_path)
+        file_size = file_stats.st_size
+        creation_date = datetime.datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d')
+        last_modified_date = datetime.datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d')
+        metadata = {
+            'page_label': '1',
+            'file_name': file_path.name,
+            'file_path': str(file_path),
+            'file_type': 'text/markdown',
+            'file_size': file_size,
+            'creation_date': creation_date,
+            'last_modified_date': last_modified_date
+        }
+        document_id = str(uuid.uuid4())
+        return Document(document_id, metadata, text)
 
-    def read_text(self, file_path: Path) -> str:
+    def read_text(self, file_path: Path) -> Document:
         """Reads the content of a plain text file.
 
         Args:
             file_path (Path): The path to the text file.
 
         Returns:
-            str: The content of the text file.
+            Document: A Document object containing the text content.
         """
         with open(file_path, encoding=self.encoding) as f:
-            return f.read()
+            text = f.read()
+        file_stats = os.stat(file_path)
+        file_size = file_stats.st_size
+        creation_date = datetime.datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d')
+        last_modified_date = datetime.datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d')
+        metadata = {
+            'page_label': '1',
+            'file_name': file_path.name,
+            'file_path': str(file_path),
+            'file_type': 'text/plain',
+            'file_size': file_size,
+            'creation_date': creation_date,
+            'last_modified_date': last_modified_date
+        }
+        document_id = str(uuid.uuid4())
+        return Document(document_id, metadata, text)
 
     def load_files(self, 
                    recursive: bool = False, 
                    ext: Optional[str] = None,
                    exc: Optional[str] = None,
-                   filenames: Optional[List[str]] = None) -> List[Dict]:
-        """Loads files from the directory with optional filters.
+                   filenames: Optional[List[str]] = None) -> List[Document]:
+        """Loads files from the directory with optional filters, returning a list of Document objects.
 
         Args:
             recursive (bool, optional): Whether to recursively search subdirectories. Defaults to False.
@@ -136,10 +170,10 @@ class FileLoader:
             filenames (Optional[List[str]], optional): Load only these specific filenames. Defaults to None.
 
         Returns:
-            List[Dict]: A list of dictionaries, where each dictionary represents a file with its content.
+            List[Document]: A list of Document objects, one for each loaded file.
         """
         directory = Path(self.directory_path)
-        files: List[Dict] = []
+        documents: List[Document] = []
 
         for file_path in directory.rglob("*") if recursive else directory.glob("*"):
             if file_path.is_file():
@@ -153,13 +187,12 @@ class FileLoader:
                     continue  # Skip if a specific extension to exclude is provided and current file matches
 
                 try:
-                    content = self.read_file(file_path)
-                    files.append({
-                        "file_path": str(file_path),
-                        "content": content,
-                        "file_name": file_path.name
-                    })
+                    if file_path.suffix.lower() == '.pdf':
+                        documents.extend(self.read_pdf(file_path))
+                    else:
+                        document = self.read_file(file_path)
+                        documents.append(document)
                 except Exception as e:
                     print(f"Error reading file {file_path}: {e}")
 
-        return files
+        return documents
