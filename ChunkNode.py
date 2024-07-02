@@ -22,7 +22,7 @@ class Node:
             text (str): The text content of the node.
             metadata (Dict): A dictionary containing metadata about the node.
         """
-        self.text = text
+        self.text = text.strip() # Bug fix remove leading/trailing spaces
         self.metadata = metadata
 
     def __repr__(self):
