@@ -5,8 +5,8 @@ from typing import List, Dict, Optional
 import uuid
 import datetime
 
-import fitz  # PyMuPDF for PDF reading
-import markdown  # For Markdown parsing
+import fitz  
+import markdown  
 from DocLoader import FileLoader, Document  # Import FileLoader and Document
 
 import re
