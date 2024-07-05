@@ -1,9 +1,6 @@
-import os
-import mimetypes
+
 from pathlib import Path
 from typing import List, Dict, Optional
-import uuid
-import datetime
 
 import fitz  
 import markdown  
