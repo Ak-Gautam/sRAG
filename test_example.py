@@ -1,6 +1,5 @@
 import numpy as np
 from collections import Counter
-from sklearn.feature_extraction.text import CountVectorizer
 
 
 corpus_of_documents = [
