@@ -27,23 +27,21 @@ corpus_of_documents = [
 ]
 
 def cosine_similarity(query, document):
-    # Tokenize the input strings
-    query = query.lower().split()
-    document = document.lower().split()
+    # Tokenize and count words
+    query_counts = Counter(query.lower().split())
+    doc_counts = Counter(document.lower().split())
     
-    # Create a combined set of unique words
-    unique_words = set(query).union(set(document))
+    # Get the union of words
+    all_words = set(query_counts.keys()) | set(doc_counts.keys())
     
-    # Vectorize the query and document
-    query_vector = np.array([query.count(word) for word in unique_words])
-    document_vector = np.array([document.count(word) for word in unique_words])
+    # Create vectors
+    query_vec = np.array([query_counts.get(word, 0) for word in all_words])
+    doc_vec = np.array([doc_counts.get(word, 0) for word in all_words])
     
-    # Compute the dot product
-    dot_product = np.dot(query_vector, document_vector)
-    
-    # Compute the norms (magnitudes) of the vectors
-    norm_query = np.linalg.norm(query_vector)
-    norm_document = np.linalg.norm(document_vector)
+    # Compute dot product and norms
+    dot_product = np.dot(query_vec, doc_vec)
+    norm_query = np.linalg.norm(query_vec)
+    norm_document = np.linalg.norm(doc_vec)
     
     # Compute and return the cosine similarity
     if norm_query == 0 or norm_document == 0:
