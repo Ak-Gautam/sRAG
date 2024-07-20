@@ -1,4 +1,6 @@
 # sRAG
 
 Work in progress, lol!
-That side rpoject that never gets complete.
+That side poject that never gets complete.
+
+A lightweight RAG implementation to quickly run it with oss models and vector stores.
