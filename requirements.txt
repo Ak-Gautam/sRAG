@@ -1,0 +1,5 @@
+pymupdf
+spacy
+sentence-transformers
+faiss-cpu
+ chromadb
