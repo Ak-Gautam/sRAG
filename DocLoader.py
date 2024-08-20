@@ -53,32 +53,6 @@ class FileLoader:
         return read_method(file_path, encoding)
 
     @staticmethod
-    def read_pdf(file_path: Path, encoding: str) -> List[Document]:
-        """Reads a PDF file and returns a list of Document objects, one for each page."""
-        documents = []
-        doc = fitz.open(str(file_path))
-        file_stats = os.stat(file_path)
-        file_size = file_stats.st_size
-        creation_date = datetime.datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d')
-        last_modified_date = datetime.datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d')
-        for page_num, page in enumerate(doc):
-            page_label = str(page_num + 1)
-            text = page.get_text()
-            metadata = {
-                'page_label': page_label,
-                'file_name': file_path.name,
-                'file_path': str(file_path),
-                'file_type': 'application/pdf',
-                'file_size': file_size,
-                'creation_date': creation_date,
-                'last_modified_date': last_modified_date
-            }
-            document_id = str(uuid.uuid4())
-            documents.append(Document(document_id, metadata, text))
-        doc.close()
-        return documents
-
-    @staticmethod
     def read_markdown(file_path: Path, encoding: str) -> List[Document]:
         """Reads a Markdown file and returns a list containing a single Document object."""
         with open(file_path, encoding=encoding) as f:
