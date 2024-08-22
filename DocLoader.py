@@ -2,7 +2,7 @@
 # This is a file loader for pdf or md files
 # It can be used to load files from a directory and return a list of documents
 # Each document is a dictionary with the following keys:
-# - id: a unique identifier for the document
+# - id: a unique identifier for the document Needs fixing.
 # - metadata: a dictionary containing metadata about the document
 # - text: the content of the document
 
@@ -145,12 +145,7 @@ class FileLoader:
         """
         Loads files from the directory with optional filters, returning a list of Document objects.
         
-        Args:
-            recursive: If True, search for files recursively in subdirectories.
-            ext: File extension filter (e.g., "*.txt").
-            exc: Exclusion pattern for files to ignore.
-            filenames: List of specific filenames to include.
-            max_workers: Maximum number of worker processes for parallel execution.
+
         """
         directory = Path(self.directory_path)
         documents: List[Document] = []
