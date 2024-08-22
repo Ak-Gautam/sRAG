@@ -145,7 +145,12 @@ class FileLoader:
         """
         Loads files from the directory with optional filters, returning a list of Document objects.
         
-
+        Args:
+            recursive: If True, search for files recursively in subdirectories.
+            ext: File extension filter (e.g., "*.txt").
+            exc: Exclusion pattern for files to ignore.
+            filenames: List of specific filenames to include.
+            max_workers: Maximum number of worker processes for parallel execution.
         """
         directory = Path(self.directory_path)
         documents: List[Document] = []
