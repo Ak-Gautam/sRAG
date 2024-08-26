@@ -1,5 +1,10 @@
-# WIP
-# Code to load pdf or md file as text for later use
+# DocLoader.py
+# This is a file loader for pdf or md files
+# It can be used to load files from a directory and return a list of documents
+# Each document is a dictionary with the following keys:
+# - id: a unique identifier for the document
+# - metadata: a dictionary containing metadata about the document
+# - text: the content of the document
 
 import os
 import mimetypes
@@ -7,30 +12,21 @@ from pathlib import Path
 from typing import List, Dict, Optional
 import uuid
 import datetime
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import fitz  # PyMuPDF for PDF reading
 import markdown  # For Markdown parsing
-
 
 class Document:
     """Represents a single document with its content and metadata."""
 
     def __init__(self, id: str, metadata: Dict, text: str):
-        """
-        Initializes a Document object.
-
-        Args:
-            id (str): A unique identifier for the document.
-            metadata (Dict): A dictionary containing metadata about the document.
-            text (str): The content of the document.
-        """
         self.id = id
         self.metadata = metadata
         self.text = text
 
     def __repr__(self):
         return f"Document(id='{self.id}', metadata={self.metadata}, text='{self.text[:20]}...')"
-
 
 class FileLoader:
     """
@@ -39,45 +35,26 @@ class FileLoader:
     """
 
     def __init__(self, directory_path: str, encoding: str = "utf-8"):
-        """
-        Initializes the FileLoader object.
-
-        Args:
-            directory_path (str): The path to the directory.
-            encoding (str, optional): The encoding of the files. Defaults to "utf-8".
-        """
         self.directory_path = directory_path
         self.encoding = encoding
 
-    def read_file(self, file_path: Path) -> str:
-        """Reads the content of a file based on its MIME type.
-
-        Args:
-            file_path (Path): The path to the file.
-
-        Returns:
-            str: The content of the file.
-        """
+    @staticmethod
+    def read_file(file_path: Path, encoding: str) -> List[Document]:
+        """Reads the content of a file based on its MIME type."""
         mime_type, _ = mimetypes.guess_type(str(file_path))
 
-        if mime_type == "application/pdf":
-            return self.read_pdf(file_path)
-        elif mime_type == "text/markdown":
-            return self.read_markdown(file_path)
-        elif mime_type == "text/plain":
-            return self.read_text(file_path)
-        else:
-            raise ValueError(f"Unsupported file type: {mime_type}")
+        read_methods = {
+            "application/pdf": FileLoader.read_pdf,
+            "text/markdown": FileLoader.read_markdown,
+            "text/plain": FileLoader.read_text
+        }
 
-    def read_pdf(self, file_path: Path) -> List[Document]:
-        """Reads the text content of a PDF file, returning a list of documents for each page.
+        read_method = read_methods.get(mime_type, FileLoader.read_text)
+        return read_method(file_path, encoding)
 
-        Args:
-            file_path (Path): The path to the PDF file.
-
-        Returns:
-            List[Document]: A list of Document objects, one for each page in the PDF.
-        """
+    @staticmethod
+    def read_pdf(file_path: Path, encoding: str) -> List[Document]:
+        """Reads a PDF file and returns a list of Document objects, one for each page."""
         documents = []
         doc = fitz.open(str(file_path))
         file_stats = os.stat(file_path)
@@ -101,16 +78,10 @@ class FileLoader:
         doc.close()
         return documents
 
-    def read_markdown(self, file_path: Path) -> Document:
-        """Reads and parses the content of a Markdown file.
-
-        Args:
-            file_path (Path): The path to the Markdown file.
-
-        Returns:
-            Document: A Document object containing the parsed Markdown text.
-        """
-        with open(file_path, encoding=self.encoding) as f:
+    @staticmethod
+    def read_markdown(file_path: Path, encoding: str) -> List[Document]:
+        """Reads a Markdown file and returns a list containing a single Document object."""
+        with open(file_path, encoding=encoding) as f:
             md_content = f.read()
         text = markdown.markdown(md_content)
         file_stats = os.stat(file_path)
@@ -127,18 +98,12 @@ class FileLoader:
             'last_modified_date': last_modified_date
         }
         document_id = str(uuid.uuid4())
-        return Document(document_id, metadata, text)
+        return [Document(document_id, metadata, text)]
 
-    def read_text(self, file_path: Path) -> Document:
-        """Reads the content of a plain text file.
-
-        Args:
-            file_path (Path): The path to the text file.
-
-        Returns:
-            Document: A Document object containing the text content.
-        """
-        with open(file_path, encoding=self.encoding) as f:
+    @staticmethod
+    def read_text(file_path: Path, encoding: str) -> List[Document]:
+        """Reads a plain text file and returns a list containing a single Document object."""
+        with open(file_path, encoding=encoding) as f:
             text = f.read()
         file_stats = os.stat(file_path)
         file_size = file_stats.st_size
@@ -154,45 +119,48 @@ class FileLoader:
             'last_modified_date': last_modified_date
         }
         document_id = str(uuid.uuid4())
-        return Document(document_id, metadata, text)
+        return [Document(document_id, metadata, text)]
+
+    @staticmethod
+    def process_file(file_path: Path, encoding: str, ext: Optional[str], exc: Optional[str], filenames: Optional[List[str]]) -> List[Document]:
+        """Processes a single file, applying filters and reading its content."""
+        if filenames is not None and file_path.name not in filenames:
+            return []
+        if ext is not None and not file_path.match(ext):
+            return []
+        if exc is not None and file_path.match(exc):
+            return []
+        try:
+            return FileLoader.read_file(file_path, encoding)
+        except Exception as e:
+            print(f"Error reading file {file_path}: {e}")
+            return []
 
     def load_files(self, 
                    recursive: bool = False, 
                    ext: Optional[str] = None,
                    exc: Optional[str] = None,
-                   filenames: Optional[List[str]] = None) -> List[Document]:
-        """Loads files from the directory with optional filters, returning a list of Document objects.
-
+                   filenames: Optional[List[str]] = None,
+                   max_workers: int = os.cpu_count()) -> List[Document]:
+        """
+        Loads files from the directory with optional filters, returning a list of Document objects.
+        
         Args:
-            recursive (bool, optional): Whether to recursively search subdirectories. Defaults to False.
-            ext (Optional[str], optional): Only load files with this extension (e.g., "*.pdf"). Defaults to None.
-            exc (Optional[str], optional): Exclude files with this extension (e.g., "*.txt"). Defaults to None.
-            filenames (Optional[List[str]], optional): Load only these specific filenames. Defaults to None.
-
-        Returns:
-            List[Document]: A list of Document objects, one for each loaded file.
+            recursive: If True, search for files recursively in subdirectories.
+            ext: File extension filter (e.g., "*.txt").
+            exc: Exclusion pattern for files to ignore.
+            filenames: List of specific filenames to include.
+            max_workers: Maximum number of worker processes for parallel execution.
         """
         directory = Path(self.directory_path)
         documents: List[Document] = []
 
-        for file_path in directory.rglob("*") if recursive else directory.glob("*"):
-            if file_path.is_file():
-                if filenames is not None and file_path.name not in filenames:
-                    continue  # Skip if specific filenames are provided and current file is not in the list
+        file_paths = list(directory.rglob("*") if recursive else directory.glob("*"))
+        file_paths = [fp for fp in file_paths if fp.is_file()]
 
-                if ext is not None and not file_path.match(ext):
-                    continue  # Skip if a specific extension is provided and current file doesn't match
-
-                if exc is not None and file_path.match(exc):
-                    continue  # Skip if a specific extension to exclude is provided and current file matches
-
-                try:
-                    if file_path.suffix.lower() == '.pdf':
-                        documents.extend(self.read_pdf(file_path))
-                    else:
-                        document = self.read_file(file_path)
-                        documents.append(document)
-                except Exception as e:
-                    print(f"Error reading file {file_path}: {e}")
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            future_to_file = {executor.submit(self.process_file, file_path, self.encoding, ext, exc, filenames): file_path for file_path in file_paths}
+            for future in as_completed(future_to_file):
+                documents.extend(future.result())
 
         return documents
