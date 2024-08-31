@@ -196,11 +196,11 @@ class ParagraphChunkSplitter(ChunkSplitter):
 
 # Factory function to select the desired chunking strategy
 def get_chunk_splitter(strategy: str, **kwargs) -> ChunkSplitter:
-    if strategy == 'token':
+    if strategy == 't':
         return TokenChunkSplitter(**kwargs)
-    elif strategy == 'overlap':
+    elif strategy == 'o':
         return SentenceChunkSplitterWithOverlap(**kwargs)
-    elif strategy == 'paragraph':
+    elif strategy == 'p':
         return ParagraphChunkSplitter()
     else:
         raise ValueError(f"Unknown chunking strategy: {strategy}")
