@@ -1,10 +1,7 @@
 from pathlib import Path
-from typing import List, Dict, Optional
-import spacy
-import fitz
-import markdown
 from DocLoader import Document
-import re
+from typing import List, Dict, Optional
+import spacy, fitz, markdown, re
 
 class Node:
     """Represents a single node containing a chunk of text and metadata."""
@@ -54,7 +51,7 @@ class TokenChunkSplitter(ChunkSplitter):
             chunk_size (int): The desired size of each chunk (in tokens).
         """
         self.chunk_size = chunk_size
-        self.nlp = spacy.load("en_core_web_sm")  # Load a small English model
+        self.nlp = spacy.load("en_core_web_sm")  # TODO: Improve modeling.
 
     def split_document(self, document: Document) -> List[Node]:
         """Splits a document into chunks of text based on tokens.
@@ -74,8 +71,6 @@ class TokenChunkSplitter(ChunkSplitter):
         current_chunk_start_index = 0
 
         for token in tokens:
-            token_len = len(token)
-
             # If adding the token would exceed the chunk size, start a new chunk
             if len(current_chunk) + 1 > self.chunk_size:
                 chunk_text = ' '.join(current_chunk)
