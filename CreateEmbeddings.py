@@ -21,4 +21,31 @@ class FaissIndex:
 
     def search(self, query_embedding: np.ndarray, k: int = 5) -> List[int]:
         distances, indices = self.index.search(query_embedding, k)
-        return indices[0].tolist()
+        return indices[0].tolist()  # Return the indices of the top-k closest nodes
+
+class ChromaVectorStore:
+    def __init__(self, collection_name: str = "vec_docs"):
+        # Persist directory will store the database, if you don't want persistence
+        # remove this parameter
+        client = chromadb.PersistentClient(path="./chroma_db")
+        self.collection = client.get_or_create_collection(name=collection_name)
+
+
+    def add_documents(self, nodes: List[Node], embeddings: np.ndarray):
+        ids = [id(node) for node in nodes]
+        metadatas = [node.metadata for node in nodes]
+        documents = [node.text for node in nodes]
+        self.collection.add(
+            ids=ids,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            documents=documents
+        )
+
+    def search(self, query_embedding: np.ndarray, k: int = 5) -> List[Tuple[str, float]]:
+        results = self.collection.query(
+            query_embeddings=query_embedding,
+            n_results=k
+        )
+        # Return a list of tuples (document_id, score)
+        return list(zip(results['ids'][0], results['distances'][0]))
