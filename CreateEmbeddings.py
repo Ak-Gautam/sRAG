@@ -28,11 +28,7 @@ class ChromaVectorStore:
         # Persist directory will store the database, if you don't want persistence
         # remove this parameter
         client = chromadb.PersistentClient(path="./chroma_db")
-        try:
-            self.collection = client.get_collection(name=collection_name)
-        except ValueError:
-            # If the collection does not exist, create it
-            self.collection = client.create_collection(name=collection_name)
+        self.collection = client.get_or_create_collection(name=collection_name)
 
 
     def add_documents(self, nodes: List[Node], embeddings: np.ndarray):
