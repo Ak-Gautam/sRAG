@@ -50,23 +50,3 @@ class ChromaVectorStore:
         # Return a list of tuples (document_id, score)
         return list(zip(results['ids'][0], results['distances'][0]))
     
-
-# Barebones test
-def add_documents(nodes: List[Node], embeddings: np.ndarray):
-    ids = [str(id(node)) for node in nodes]
-    metadatas = [node.metadata for node in nodes]
-    documents = [node.text for node in nodes]
-    collection.add(
-        ids=ids,
-        embeddings=embeddings,
-        metadatas=metadatas,
-        documents=documents
-    )
-
-def search(query_embedding: np.ndarray, k: int = 5) -> List[Tuple[str, float]]:
-    results = collection.query(
-        query_embeddings=query_embedding,
-        n_results=k
-    )
-    # Return a list of tuples (document_id, score)
-    return list(zip(results['ids'][0], results['distances'][0]))
