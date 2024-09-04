@@ -51,16 +51,6 @@ class ChromaVectorStore:
         return list(zip(results['ids'][0], results['distances'][0]))
     
 
-# Test
-from CreateEmbeddings import EmbeddingGenerator, FaissIndex, ChromaVectorStore
-
-# 1. Generate embeddings for the nodes:
-embedding_generator = EmbeddingGenerator()
-embeddings = embedding_generator.generate_embeddings(nodes)
-
-# 2. (Optional) Create a FAISS index for quick in-memory searches:
-faiss_index = FaissIndex(embeddings)
-
 # Barebones test
 def add_documents(nodes: List[Node], embeddings: np.ndarray):
     ids = [str(id(node)) for node in nodes]
