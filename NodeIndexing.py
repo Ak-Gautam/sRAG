@@ -108,3 +108,20 @@ class VectorIndex:
             List[List[float]]: A list of embedding vectors, one for each node.
         """
         return self.embedding_model.encode([node.text for node in nodes])
+
+    def query(self, query_str: str, top_k: int = 3) -> List[Node]:
+        """
+        Performs a query against the index to retrieve the most similar nodes.
+
+        Args:
+            query_str (str): The query string.
+            top_k (int, optional): The number of top matching nodes to return. 
+                                    Defaults to 3.
+
+        Returns:
+            List[Node]: A list of the top_k matching nodes.
+        """
+        query_embedding = self.embedding_model.encode(query_str)
+        similarities = cosine_similarity([query_embedding], self.embeddings)[0]
+        top_indices = similarities.argsort()[-top_k:][::-1]
+        return [self.nodes[i] for i in top_indices]
