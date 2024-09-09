@@ -87,15 +87,6 @@ class VectorIndex:
         if nodes:  # Generate embeddings if nodes are provided during initialization
             self.embeddings = self.generate_embeddings(nodes)
 
-    def add_nodes(self, nodes: List[Node]):
-        """
-        Adds nodes to the index and updates embeddings.
-
-        Args:
-            nodes (List[Node]): The list of nodes to add.
-        """
-        self.nodes.extend(nodes)
-        self.embeddings.extend(self.generate_embeddings(nodes)) 
 
     def generate_embeddings(self, nodes: List[Node]) -> List[List[float]]:
         """
