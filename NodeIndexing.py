@@ -98,7 +98,6 @@ class VectorIndex:
         self.embeddings.extend(self.generate_embeddings(nodes)) 
 
 
-
     def query(self, query_str: str, top_k: int = 3) -> List[Node]:
         """
         Performs a query against the index to retrieve the most similar nodes.
