@@ -97,6 +97,17 @@ class VectorIndex:
         self.nodes.extend(nodes)
         self.embeddings.extend(self.generate_embeddings(nodes)) 
 
+    def generate_embeddings(self, nodes: List[Node]) -> List[List[float]]:
+        """
+        Generates embeddings for the given nodes using the embedding model.
+
+        Args:
+            nodes (List[Node]): The list of nodes.
+
+        Returns:
+            List[List[float]]: A list of embedding vectors, one for each node.
+        """
+        return self.embedding_model.encode([node.text for node in nodes])
 
     def query(self, query_str: str, top_k: int = 3) -> List[Node]:
         """
