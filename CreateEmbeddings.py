@@ -1,3 +1,5 @@
+# This is an attempt at creating embeddings and saving it in a vector database.
+
 from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
