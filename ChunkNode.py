@@ -77,17 +77,3 @@ class ChunkSplitter:
         for document in documents:
             nodes.extend(self.split_document(document))
         return nodes
-
-# Example Usage:
-
-# 1. Load files using FileLoader
-loader = FileLoader("/content/my_directory")  # Replace with your directory path
-documents = loader.load_files(recursive=True, exc="*.txt")
-
-# 2. Split documents into chunks
-splitter = ChunkSplitter(chunk_size=512)  # Adjust chunk size as needed
-nodes = splitter.get_nodes_from_documents(documents)
-
-# 3. Process nodes (example: print metadata)
-for node in nodes:
-    print(node)
