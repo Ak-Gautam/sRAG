@@ -163,3 +163,45 @@ class SentenceChunkSplitterWithOverlap(ChunkSplitter):
             nodes.append(Node(current_chunk, chunk_metadata))
 
         return nodes
+    
+class ParagraphChunkSplitter(ChunkSplitter):
+    """Splits documents into chunks of text based on paragraphs."""
+
+    def split_document(self, document: Document) -> List[Node]:
+        """Splits a document into chunks of text based on paragraphs.
+
+        Args:
+            document (Document): The Document to split.
+
+        Returns:
+            List[Node]: A list of Node objects representing the chunks.
+        """
+        text = document.text
+        paragraphs = text.split('\n\n')  # Split by double newline
+
+        nodes = []
+        current_chunk_start_index = 0
+
+        for paragraph in paragraphs:
+            paragraph_len = len(paragraph)
+            chunk_metadata = {
+                'document_id': document.id,
+                'page_label': document.metadata.get('page_label'),
+                'start_index': current_chunk_start_index,
+                'end_index': current_chunk_start_index + paragraph_len
+            }
+            nodes.append(Node(paragraph, chunk_metadata))
+            current_chunk_start_index += paragraph_len + 2  # Include double newline
+
+        return nodes
+
+# Factory function to select the desired chunking strategy
+def get_chunk_splitter(strategy: str, **kwargs) -> ChunkSplitter:
+    if strategy == 'token':
+        return TokenChunkSplitter(**kwargs)
+    elif strategy == 'overlap':
+        return SentenceChunkSplitterWithOverlap(**kwargs)
+    elif strategy == 'paragraph':
+        return ParagraphChunkSplitter()
+    else:
+        raise ValueError(f"Unknown chunking strategy: {strategy}")
