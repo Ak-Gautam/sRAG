@@ -74,11 +74,9 @@ class TokenChunkSplitter(ChunkSplitter):
         current_chunk = []
         current_chunk_start_index = 0
 
-        for token in tokens:
-            token_len = len(token)
-
+        for i, token in enumerate(tokens):
             # If adding the token would exceed the chunk size, start a new chunk
-            if len(current_chunk) + 1 > self.chunk_size:
+            if len(current_chunk) >= self.chunk_size:
                 chunk_text = ' '.join(current_chunk)
                 chunk_metadata = {
                     'document_id': document.id,
@@ -87,8 +85,8 @@ class TokenChunkSplitter(ChunkSplitter):
                     'end_index': current_chunk_start_index + len(chunk_text)
                 }
                 nodes.append(Node(chunk_text, chunk_metadata))
-                current_chunk = [token]
-                current_chunk_start_index += len(chunk_text) + 1  # Include space
+                current_chunk = [token]  # Start a new chunk with the current token
+                current_chunk_start_index = doc[i].idx  # Get the character index of the token
             else:
                 current_chunk.append(token)
 
