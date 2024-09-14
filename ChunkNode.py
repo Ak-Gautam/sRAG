@@ -117,6 +117,8 @@ class SentenceChunkSplitterWithOverlap(ChunkSplitter):
         """
         self.chunk_size = chunk_size
         self.overlap = overlap
+        nltk.download('punkt', quiet=True)  # Download Punkt sentence tokenizer
+        self.tokenizer = nltk.tokenize.PunktSentenceTokenizer()
 
     def split_document(self, document: Document) -> List[Node]:
         """Splits a document into chunks of text based on sentences with overlap.
@@ -128,7 +130,7 @@ class SentenceChunkSplitterWithOverlap(ChunkSplitter):
             List[Node]: A list of Node objects representing the chunks.
         """
         text = document.text
-        sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s', text)
+        sentences = self.tokenizer.tokenize(text)
 
         nodes = []
         current_chunk = ""
@@ -145,9 +147,13 @@ class SentenceChunkSplitterWithOverlap(ChunkSplitter):
                     'start_index': current_chunk_start_index,
                     'end_index': current_chunk_start_index + len(current_chunk)
                 }
-                nodes.append(Node(current_chunk, chunk_metadata))
-                current_chunk = sentence
-                current_chunk_start_index = current_chunk_start_index + len(current_chunk) - self.overlap
+                nodes.append(Node(current_chunk.strip(), chunk_metadata))
+                
+                # Overlap logic: Start the next chunk with the overlapping portion
+                overlap_start = max(0, len(current_chunk) - self.overlap)
+                current_chunk = current_chunk[overlap_start:] + " " + sentence
+                current_chunk_start_index += len(current_chunk) - sentence_len - 1 # Subtract the added space
+
             else:
                 current_chunk += " " + sentence
 
@@ -159,7 +165,7 @@ class SentenceChunkSplitterWithOverlap(ChunkSplitter):
                 'start_index': current_chunk_start_index,
                 'end_index': current_chunk_start_index + len(current_chunk)
             }
-            nodes.append(Node(current_chunk, chunk_metadata))
+            nodes.append(Node(current_chunk.strip(), chunk_metadata))
 
         return nodes
     
