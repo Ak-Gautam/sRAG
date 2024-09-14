@@ -172,6 +172,15 @@ class SentenceChunkSplitterWithOverlap(ChunkSplitter):
 class ParagraphChunkSplitter(ChunkSplitter):
     """Splits documents into chunks of text based on paragraphs."""
 
+    def __init__(self, chunk_size: int = 2048):
+        """
+        Initializes the ParagraphChunkSplitter object.
+
+        Args:
+            chunk_size (int): The desired size of each chunk (in characters).
+        """
+        self.chunk_size = chunk_size
+
     def split_document(self, document: Document) -> List[Node]:
         """Splits a document into chunks of text based on paragraphs.
 
@@ -185,18 +194,35 @@ class ParagraphChunkSplitter(ChunkSplitter):
         paragraphs = text.split('\n\n')  # Split by double newline
 
         nodes = []
+        current_chunk = ""
         current_chunk_start_index = 0
 
         for paragraph in paragraphs:
             paragraph_len = len(paragraph)
+
+            # If adding the paragraph would exceed the chunk size, start a new chunk
+            if len(current_chunk) + paragraph_len > self.chunk_size:
+                chunk_metadata = {
+                    'document_id': document.id,
+                    'page_label': document.metadata.get('page_label'),
+                    'start_index': current_chunk_start_index,
+                    'end_index': current_chunk_start_index + len(current_chunk)
+                }
+                nodes.append(Node(current_chunk.strip(), chunk_metadata))
+                current_chunk = paragraph  # Start a new chunk with the current paragraph
+                current_chunk_start_index += len(current_chunk) + 2 # Add 2 for the double newline
+            else:
+                current_chunk += paragraph + "\n\n"  # Add the paragraph and double newline
+
+        # Append the last chunk if it's not empty
+        if current_chunk:
             chunk_metadata = {
                 'document_id': document.id,
                 'page_label': document.metadata.get('page_label'),
                 'start_index': current_chunk_start_index,
-                'end_index': current_chunk_start_index + paragraph_len
+                'end_index': current_chunk_start_index + len(current_chunk)
             }
-            nodes.append(Node(paragraph, chunk_metadata))
-            current_chunk_start_index += paragraph_len + 2  # Include double newline
+            nodes.append(Node(current_chunk.strip(), chunk_metadata))
 
         return nodes
 
@@ -207,6 +233,6 @@ def get_chunk_splitter(strategy: str, **kwargs) -> ChunkSplitter:
     elif strategy == 'overlap':
         return SentenceChunkSplitterWithOverlap(**kwargs)
     elif strategy == 'paragraph':
-        return ParagraphChunkSplitter()
+        return ParagraphChunkSplitter(**kwargs)
     else:
         raise ValueError(f"Unknown chunking strategy: {strategy}")
