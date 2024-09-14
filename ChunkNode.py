@@ -3,8 +3,9 @@ from typing import List, Dict, Optional
 import spacy
 import fitz
 import markdown
-from DocLoader import Document
 import re
+import nltk
+from DocLoader import Document
 
 
 class Node:
