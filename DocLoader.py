@@ -6,6 +6,7 @@
 # - metadata: a dictionary containing metadata about the document
 # - text: the content of the document
 
+# DocLoader.py
 import os
 import mimetypes
 from pathlib import Path
