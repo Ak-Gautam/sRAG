@@ -1,68 +1,40 @@
-#wip
+# VectorIndex.py
 
-# This attempt is likely not going to work but well.
+from sentence_transformers import SentenceTransformer
+import chromadb
+import numpy as np
+from typing import List
+from ChunkNode import Node  # Import from your ChunkNode module
 
-from DocLoader import Document, FileLoader
-from ChunkNode import Node, SentenceChunkSplitter
+class EmbeddingGenerator:
+    def __init__(self, model_name: str = "liddlefish/privacy_embedding_rag_10k_base_15_final"):
+        self.model = SentenceTransformer(model_name)
 
-from pathlib import Path
-from typing import List, Dict, Optional, Any
-import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import re
+    def generate_embeddings(self, nodes: List[Node]) -> np.ndarray:
+        embeddings = self.model.encode([node.text for node in nodes])
+        return embeddings
 
+class ChromaVectorStore:
+    def __init__(self, collection_name: str = "vec_docs"):
+        client = chromadb.PersistentClient(path="./chroma_db")
+        self.collection = client.get_or_create_collection(name=collection_name)
 
-class SummaryIndex:
-    """
-    An index for summarization using a pre-trained LLM (Qwen/Qwen2-1.5B-Instruct).
-    """
+    def add_documents(self, nodes: List[Node], embeddings: np.ndarray):
+        ids = [node.metadata['document_id'] for node in nodes]  # Use document_id from node metadata
+        metadatas = [node.metadata for node in nodes]
+        documents = [node.text for node in nodes]
+        self.collection.add(
+            ids=ids,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            documents=documents
+        )
 
-    def __init__(self, nodes: List[Node] = None, model_name: str = "Qwen/Qwen-2-1.5B-Instruct",
-                 device: str = "cuda" if torch.cuda.is_available() else "cpu"):
-        """
-        Initializes the SummaryIndex.
+class VectorIndex:
+    def __init__(self, collection_name: str = "vec_docs"):
+        self.embedding_generator = EmbeddingGenerator()
+        self.vector_store = ChromaVectorStore(collection_name)
 
-        Args:
-            nodes (List[Node], optional): An initial list of nodes. Defaults to None.
-            model_name (str, optional): The name of the Hugging Face Transformers model 
-                                       to use for summarization. Defaults to "Qwen/Qwen-2-1.5B-Instruct".
-            device (str, optional): The device to run the model on ('cuda' or 'cpu').
-                                     Defaults to 'cuda' if available, else 'cpu'.
-        """
-        self.nodes = nodes if nodes is not None else []
-        self.model_name = model_name
-        self.device = device
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name, torch_dtype=torch.float16).to(self.device) 
-
-    def add_nodes(self, nodes: List[Node]):
-        """
-        Adds a list of nodes to the index.
-
-        Args:
-            nodes (List[Node]): The list of nodes to add.
-        """
-        self.nodes.extend(nodes)
-
-    def query(self, query_str: str = None, max_length: int = 100) -> str:
-        """
-        Generates a summary using the loaded LLM.
-
-        Args:
-            query_str (str, optional): The query string. The text of all nodes is 
-                                       summarized, regardless of the query.
-                                       Defaults to None. 
-            max_length (int, optional): The maximum length of the generated summary. 
-                                        Defaults to 100.
-
-        Returns:
-            str: The generated summary.
-        """
-        all_text = " ".join([node.text for node in self.nodes])
-
-        # Tokenize input text and generate summary
-        inputs = self.tokenizer(all_text, return_tensors="pt").to(self.device)
-        summary_ids = self.model.generate(**inputs, max_length=max_length)
-        summary = self.tokenizer.batch_decode(summary_ids, skip_special_tokens=True)[0]
-
-        return summary
+    def build_index_from_nodes(self, nodes: List[Node]):
+        embeddings = self.embedding_generator.generate_embeddings(nodes)
+        self.vector_store.add_documents(nodes, embeddings)
