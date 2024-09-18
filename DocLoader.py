@@ -55,7 +55,6 @@ class FileLoader:
 
     @staticmethod
     def read_pdf(file_path: Path, encoding: str) -> List[Document]:
-        """Reads a PDF file and returns a list of Document objects, one for each page."""
         documents = []
         doc = fitz.open(str(file_path))
         file_stats = os.stat(file_path)
@@ -81,7 +80,6 @@ class FileLoader:
 
     @staticmethod
     def read_markdown(file_path: Path, encoding: str) -> List[Document]:
-        """Reads a Markdown file and returns a list containing a single Document object."""
         with open(file_path, encoding=encoding) as f:
             md_content = f.read()
         text = markdown.markdown(md_content)
@@ -103,7 +101,6 @@ class FileLoader:
 
     @staticmethod
     def read_text(file_path: Path, encoding: str) -> List[Document]:
-        """Reads a plain text file and returns a list containing a single Document object."""
         with open(file_path, encoding=encoding) as f:
             text = f.read()
         file_stats = os.stat(file_path)
@@ -124,7 +121,6 @@ class FileLoader:
 
     @staticmethod
     def process_file(file_path: Path, encoding: str, ext: Optional[str], exc: Optional[str], filenames: Optional[List[str]]) -> List[Document]:
-        """Processes a single file, applying filters and reading its content."""
         if filenames is not None and file_path.name not in filenames:
             return []
         if ext is not None and not file_path.match(ext):
@@ -137,22 +133,13 @@ class FileLoader:
             print(f"Error reading file {file_path}: {e}")
             return []
 
-    def load_files(self, 
-                   recursive: bool = False, 
+    def load_files(self,
+                   recursive: bool = False,
                    ext: Optional[str] = None,
                    exc: Optional[str] = None,
                    filenames: Optional[List[str]] = None,
                    max_workers: int = os.cpu_count()) -> List[Document]:
-        """
-        Loads files from the directory with optional filters, returning a list of Document objects.
-        
-        Args:
-            recursive: If True, search for files recursively in subdirectories.
-            ext: File extension filter (e.g., "*.txt").
-            exc: Exclusion pattern for files to ignore.
-            filenames: List of specific filenames to include.
-            max_workers: Maximum number of worker processes for parallel execution.
-        """
+        """Loads files from the directory with optional filters, returning a list of Document objects."""
         directory = Path(self.directory_path)
         documents: List[Document] = []
 
