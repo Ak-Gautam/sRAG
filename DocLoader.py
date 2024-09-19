@@ -165,3 +165,50 @@ class FileLoader:
                 documents.extend(future.result())
 
         return documents
+    
+
+# Requirements outline:
+from DocLoader import FileLoader
+import os
+
+def simple_preprocess(text: str) -> str:
+    # This is a simple preprocessing function that removes extra whitespace
+    return ' '.join(text.split())
+
+# Initialize the FileLoader
+loader = FileLoader(directory_path="/path/to/your/documents")
+
+# Example 1: Load all files recursively with default settings
+documents = loader.load_files(recursive=True)
+
+# Example 2: Load only PDF and Markdown files
+documents = loader.load_files(recursive=True, ext="*.{pdf,md}")
+
+# Example 3: Load files excluding certain patterns
+documents = loader.load_files(recursive=True, exc="*{temp,draft}*")
+
+# Example 4: Load specific files by name
+documents = loader.load_files(filenames=["document1.pdf", "document2.md"])
+
+# Example 5: Load files with a preprocessing function
+documents = loader.load_files(recursive=True, preprocess_fn=simple_preprocess)
+
+# Example 6: Load files with custom maximum workers
+documents = loader.load_files(recursive=True, max_workers=4)
+
+# Example 7: Combine multiple options
+documents = loader.load_files(
+    recursive=True,
+    ext="*.{pdf,md}",
+    exc="*draft*",
+    preprocess_fn=simple_preprocess,
+    max_workers=os.cpu_count() // 2  # Use half of available CPU cores
+)
+
+# Process the loaded documents
+for doc in documents:
+    print(f"Document ID: {doc.id}")
+    print(f"File name: {doc.metadata['file_name']}")
+    print(f"File type: {doc.metadata['file_type']}")
+    print(f"Text preview: {doc.text[:100]}...")  # Print first 100 characters
+    print("---")
