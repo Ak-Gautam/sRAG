@@ -120,26 +120,19 @@ class FileLoader:
         return documents
 
     @staticmethod
-    def read_markdown(file_path: Path, encoding: str) -> List[Document]:
-        """Reads a Markdown file and returns a list containing a single Document object."""
-        with open(file_path, encoding=encoding) as f:
-            md_content = f.read()
-        text = markdown.markdown(md_content)
-        file_stats = os.stat(file_path)
-        file_size = file_stats.st_size
-        creation_date = datetime.datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d')
-        last_modified_date = datetime.datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d')
-        metadata = {
-            'page_label': '1',
-            'file_name': file_path.name,
-            'file_path': str(file_path),
-            'file_type': 'text/markdown',
-            'file_size': file_size,
-            'creation_date': creation_date,
-            'last_modified_date': last_modified_date
-        }
-        document_id = str(uuid.uuid4())
-        return [Document(document_id, metadata, text)]
+    def read_markdown(file_path: Path, encoding: str, preprocess_fn: Optional[Callable[[str], str]] = None) -> List[Document]:
+        try:
+            with open(file_path, encoding=encoding) as f:
+                md_content = f.read()
+            # Convert Markdown to plain text for consistency
+            text = markdown.markdown(md_content)
+            if preprocess_fn:
+                text = preprocess_fn(text)
+        except Exception as e:
+            logger.error(f"Failed to read or preprocess Markdown file {file_path}: {e}")
+            text = ""
+
+        return [FileLoader._create_single_document(file_path, text, 'text/markdown')]
 
     @staticmethod
     def read_text(file_path: Path, encoding: str) -> List[Document]:
