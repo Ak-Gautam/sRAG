@@ -18,6 +18,12 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import fitz  # PyMuPDF for PDF reading
 import markdown  # For Markdown parsing
 
+import logging
+
+# Configure logging for better error tracking
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class Document:
     """Represents a single document with its content and metadata."""
 
