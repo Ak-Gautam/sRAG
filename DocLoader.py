@@ -137,23 +137,14 @@ class FileLoader:
     @staticmethod
     def read_text(file_path: Path, encoding: str) -> List[Document]:
         """Reads a plain text file and returns a list containing a single Document object."""
-        with open(file_path, encoding=encoding) as f:
-            text = f.read()
-        file_stats = os.stat(file_path)
-        file_size = file_stats.st_size
-        creation_date = datetime.datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d')
-        last_modified_date = datetime.datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d')
-        metadata = {
-            'page_label': '1',
-            'file_name': file_path.name,
-            'file_path': str(file_path),
-            'file_type': 'text/plain',
-            'file_size': file_size,
-            'creation_date': creation_date,
-            'last_modified_date': last_modified_date
-        }
-        document_id = str(uuid.uuid4())
-        return [Document(document_id, metadata, text)]
+        try:
+            with open(file_path, encoding=encoding) as f:
+                text = f.read()
+        except Exception as e:
+            logger.error(f"Failed to read text file {file_path}: {e}")
+            text = ""
+
+        return [FileLoader._create_single_document(file_path, text, 'text/plain')]
 
     @staticmethod
     def process_file(file_path: Path, encoding: str, ext: Optional[str], exc: Optional[str], filenames: Optional[List[str]]) -> List[Document]:
