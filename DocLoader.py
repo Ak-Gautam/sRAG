@@ -46,18 +46,28 @@ class FileLoader:
         self.encoding = encoding
 
     @staticmethod
-    def read_file(file_path: Path, encoding: str) -> List[Document]:
-        """Reads the content of a file based on its MIME type."""
+    def read_file(file_path: Path, encoding: str, preprocess_fn: Optional[Callable[[str], str]] = None) -> List[Document]:
         mime_type, _ = mimetypes.guess_type(str(file_path))
 
         read_methods = {
             "application/pdf": FileLoader.read_pdf,
             "text/markdown": FileLoader.read_markdown,
-            "text/plain": FileLoader.read_text
+            "text/plain": FileLoader.read_text,
+            # code MIME types
+            "text/x-python": FileLoader.read_code,
+            "text/javascript": FileLoader.read_code,
+            "application/typescript": FileLoader.read_code,
+            "text/x-java-source": FileLoader.read_code,
+            "text/x-c++src": FileLoader.read_code,
+            "text/x-csrc": FileLoader.read_code,
+            "text/x-ruby": FileLoader.read_code,
+            "text/x-go": FileLoader.read_code,
+            "text/x-shellscript": FileLoader.read_code,
+
         }
 
         read_method = read_methods.get(mime_type, FileLoader.read_text)
-        return read_method(file_path, encoding)
+        return read_method(file_path, encoding, preprocess_fn)
 
     @staticmethod
     def read_pdf(file_path: Path, encoding: str) -> List[Document]:
