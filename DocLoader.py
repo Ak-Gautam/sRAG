@@ -10,14 +10,12 @@
 import os
 import mimetypes
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Callable
 import uuid
 import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
-
 import fitz  # PyMuPDF for PDF reading
 import markdown  # For Markdown parsing
-
 import logging
 
 # Configure logging for better error tracking
@@ -41,9 +39,30 @@ class FileLoader:
     returning documents with metadata and text content.
     """
 
+    # Define supported code MIME types
+    CODE_MIME_TYPES = {
+        'text/x-python': '.py',
+        'text/javascript': '.js',
+        'text/x-java-source': '.java',
+        'text/x-c++src': '.cpp',
+        'text/x-csrc': '.c',
+        'text/x-ruby': '.rb',
+        'text/x-go': '.go',
+        'text/x-shellscript': '.sh',
+        'application/typescript': '.ts',
+        # Add more as needed
+    }
+
     def __init__(self, directory_path: str, encoding: str = "utf-8"):
         self.directory_path = directory_path
         self.encoding = encoding
+        # Extend mimetypes with additional code types
+        self._initialize_mimetypes()
+
+    def _initialize_mimetypes(self):
+        # Ensure code MIME types are recognized
+        for mime, ext in self.CODE_MIME_TYPES.items():
+            mimetypes.add_type(mime, ext)
 
     @staticmethod
     def read_file(file_path: Path, encoding: str, preprocess_fn: Optional[Callable[[str], str]] = None) -> List[Document]:
