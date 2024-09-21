@@ -1,12 +1,4 @@
 # DocLoader.py
-# This is a file loader for pdf or md files
-# It can be used to load files from a directory and return a list of documents
-# Each document is a dictionary with the following keys:
-# - id: a unique identifier for the document Needs fixing.
-# - metadata: a dictionary containing metadata about the document
-# - text: the content of the document
-
-# DocLoader.py
 import os
 import mimetypes
 from pathlib import Path
@@ -14,8 +6,8 @@ from typing import List, Dict, Optional, Callable
 import uuid
 import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
-import fitz  # PyMuPDF for PDF reading
-import markdown  # For Markdown parsing
+import fitz
+import markdown
 import logging
 
 # Configure logging for better error tracking
@@ -89,28 +81,41 @@ class FileLoader:
         return read_method(file_path, encoding, preprocess_fn)
 
     @staticmethod
-    def read_pdf(file_path: Path, encoding: str) -> List[Document]:
-        """Reads a PDF file and returns a list of Document objects, one for each page."""
+    def read_pdf(file_path: Path, encoding: str, preprocess_fn: Optional[Callable[[str], str]] = None) -> List[Document]:
         documents = []
-        doc = fitz.open(str(file_path))
-        file_stats = os.stat(file_path)
-        file_size = file_stats.st_size
-        creation_date = datetime.datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d')
-        last_modified_date = datetime.datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d')
+        try:
+            doc = fitz.open(str(file_path))
+        except Exception as e:
+            logger.error(f"Failed to open PDF file {file_path}: {e}")
+            return documents
+
+        file_stats = file_path.stat()
+        metadata_common = {
+            'file_name': file_path.name,
+            'file_path': str(file_path),
+            'file_type': 'application/pdf',
+            'file_size': file_stats.st_size,
+            'creation_date': datetime.datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d'),
+            'last_modified_date': datetime.datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d')
+        }
+
         for page_num, page in enumerate(doc):
-            page_label = str(page_num + 1)
-            text = page.get_text()
-            metadata = {
-                'page_label': page_label,
-                'file_name': file_path.name,
-                'file_path': str(file_path),
-                'file_type': 'application/pdf',
-                'file_size': file_size,
-                'creation_date': creation_date,
-                'last_modified_date': last_modified_date
-            }
+            try:
+                text = page.get_text()
+                if preprocess_fn:
+                    text = preprocess_fn(text)
+            except Exception as e:
+                logger.warning(f"Failed to extract or preprocess text from page {page_num+1} in {file_path}: {e}")
+                text = ""
+
+            metadata = metadata_common.copy()
+            metadata.update({
+                'page_label': str(page_num + 1)
+            })
+
             document_id = str(uuid.uuid4())
             documents.append(Document(document_id, metadata, text))
+
         doc.close()
         return documents
 
