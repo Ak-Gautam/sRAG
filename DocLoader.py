@@ -175,8 +175,7 @@ class FileLoader:
         return Document(document_id, metadata, text)
 
     @staticmethod
-    def process_file(file_path: Path, encoding: str, ext: Optional[str], exc: Optional[str], filenames: Optional[List[str]]) -> List[Document]:
-        """Processes a single file, applying filters and reading its content."""
+    def process_file(file_path: Path, encoding: str, ext: Optional[str], exc: Optional[str], filenames: Optional[List[str]], preprocess_fn: Optional[Callable[[str], str]] = None) -> List[Document]:
         if filenames is not None and file_path.name not in filenames:
             return []
         if ext is not None and not file_path.match(ext):
@@ -184,9 +183,9 @@ class FileLoader:
         if exc is not None and file_path.match(exc):
             return []
         try:
-            return FileLoader.read_file(file_path, encoding)
+            return FileLoader.read_file(file_path, encoding, preprocess_fn)
         except Exception as e:
-            print(f"Error reading file {file_path}: {e}")
+            logger.error(f"Error reading file {file_path}: {e}")
             return []
 
     def load_files(self, 
