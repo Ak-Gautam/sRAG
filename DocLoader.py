@@ -159,6 +159,22 @@ class FileLoader:
         return [FileLoader._create_single_document(file_path, code, mimetypes.guess_type(str(file_path))[0] or 'text/plain')]
 
     @staticmethod
+    def _create_single_document(file_path: Path, text: str, mime_type: str) -> Document:
+        """Helper method to create a single Document object with common metadata."""
+        file_stats = file_path.stat()
+        metadata = {
+            'page_label': '1',
+            'file_name': file_path.name,
+            'file_path': str(file_path),
+            'file_type': mime_type,
+            'file_size': file_stats.st_size,
+            'creation_date': datetime.datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d'),
+            'last_modified_date': datetime.datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d')
+        }
+        document_id = str(uuid.uuid4())
+        return Document(document_id, metadata, text)
+
+    @staticmethod
     def process_file(file_path: Path, encoding: str, ext: Optional[str], exc: Optional[str], filenames: Optional[List[str]]) -> List[Document]:
         """Processes a single file, applying filters and reading its content."""
         if filenames is not None and file_path.name not in filenames:
