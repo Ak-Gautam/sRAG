@@ -1,14 +1,14 @@
 # DocLoader.py
 import os
+import uuid
+import fitz
+import logging
+import datetime
+import markdown
 import mimetypes
 from pathlib import Path
 from typing import List, Dict, Optional, Callable
-import uuid
-import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
-import fitz
-import markdown
-import logging
 
 # Configure logging for better error tracking
 logging.basicConfig(level=logging.INFO)
