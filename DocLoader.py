@@ -24,7 +24,7 @@ class Document:
 
     def __repr__(self):
         return f"Document(id='{self.id}', metadata={self.metadata}, text='{self.text[:20]}...')"
-
+        
 class FileLoader:
     """
     A class for loading and reading files from a directory,
@@ -133,6 +133,7 @@ class FileLoader:
             text = ""
 
         return [FileLoader._create_single_document(file_path, text, 'text/markdown')]
+
 
     @staticmethod
     def read_text(file_path: Path, encoding: str) -> List[Document]:
