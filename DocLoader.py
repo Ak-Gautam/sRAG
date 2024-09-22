@@ -147,6 +147,18 @@ class FileLoader:
         return [FileLoader._create_single_document(file_path, text, 'text/plain')]
 
     @staticmethod
+    def read_code(file_path: Path, encoding: str) -> List[Document]:
+        """Reads a code file and returns a list containing a single Document object."""
+        try:
+            with open(file_path, encoding=encoding) as f:
+                code = f.read()
+        except Exception as e:
+            logger.error(f"Failed to read code file {file_path}: {e}")
+            code = ""
+
+        return [FileLoader._create_single_document(file_path, code, mimetypes.guess_type(str(file_path))[0] or 'text/plain')]
+
+    @staticmethod
     def process_file(file_path: Path, encoding: str, ext: Optional[str], exc: Optional[str], filenames: Optional[List[str]]) -> List[Document]:
         """Processes a single file, applying filters and reading its content."""
         if filenames is not None and file_path.name not in filenames:
