@@ -188,31 +188,39 @@ class FileLoader:
             logger.error(f"Error reading file {file_path}: {e}")
             return []
 
-    def load_files(self, 
-                   recursive: bool = False, 
-                   ext: Optional[str] = None,
-                   exc: Optional[str] = None,
-                   filenames: Optional[List[str]] = None,
-                   max_workers: int = os.cpu_count()) -> List[Document]:
-        """
-        Loads files from the directory with optional filters, returning a list of Document objects.
-        
-        Args:
-            recursive: If True, search for files recursively in subdirectories.
-            ext: File extension filter (e.g., "*.txt").
-            exc: Exclusion pattern for files to ignore.
-            filenames: List of specific filenames to include.
-            max_workers: Maximum number of worker processes for parallel execution.
-        """
+    def load_files(
+        self,
+        recursive: bool = False,
+        ext: Optional[str] = None,
+        exc: Optional[str] = None,
+        filenames: Optional[List[str]] = None,
+        max_workers: int = os.cpu_count(),
+        preprocess_fn: Optional[Callable[[str], str]] = None
+    ) -> List[Document]:
         directory = Path(self.directory_path)
         documents: List[Document] = []
 
-        file_paths = list(directory.rglob("*") if recursive else directory.glob("*"))
-        file_paths = [fp for fp in file_paths if fp.is_file()]
+        file_generator = directory.rglob("*") if recursive else directory.glob("*")
+        file_paths = (fp for fp in file_generator if fp.is_file())
 
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            future_to_file = {executor.submit(self.process_file, file_path, self.encoding, ext, exc, filenames): file_path for file_path in file_paths}
-            for future in as_completed(future_to_file):
-                documents.extend(future.result())
+            futures = {
+                executor.submit(
+                    self.process_file,
+                    file_path,
+                    self.encoding,
+                    ext,
+                    exc,
+                    filenames,
+                    preprocess_fn
+                ): file_path for file_path in file_paths
+            }
+
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    documents.extend(result)
+                except Exception as e:
+                    logger.error(f"Error processing file {futures[future]}: {e}")
 
         return documents
