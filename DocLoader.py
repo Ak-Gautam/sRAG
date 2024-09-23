@@ -192,12 +192,12 @@ class FileLoader:
     def load_files(
         self,
         recursive: bool = False,
-        ext: Optional[str] = None,
-        exc: Optional[str] = None,
+        ext: Optional[List[str]] = None,
+        exc: Optional[List[str]] = None,
         filenames: Optional[List[str]] = None,
         max_workers: int = os.cpu_count(),
         preprocess_fn: Optional[Callable[[str], str]] = None
-    ) -> List[Document]:
+        ) -> List[Document]:
         directory = Path(self.directory_path)
         documents: List[Document] = []
 
