@@ -176,13 +176,19 @@ class FileLoader:
         return Document(document_id, metadata, text)
 
     @staticmethod
-    def process_file(file_path: Path, encoding: str, ext: Optional[str], exc: Optional[str], filenames: Optional[List[str]], preprocess_fn: Optional[Callable[[str], str]] = None) -> List[Document]:
+    def process_file(file_path: Path, encoding: str, ext: Optional[List[str]], exc: Optional[List[str]], filenames: Optional[List[str]], preprocess_fn: Optional[Callable[[str], str]] = None) -> List[Document]:
+        # Check if the file should be processed based on filename
         if filenames is not None and file_path.name not in filenames:
             return []
-        if ext is not None and not file_path.match(ext):
-            return []
-        if exc is not None and file_path.match(exc):
-            return []
+        
+        if ext is not None:
+            if not any(file_path.match(pattern) for pattern in ext):
+                return []
+        
+        if exc is not None:
+            if any(file_path.match(pattern) for pattern in exc):
+                return []
+        
         try:
             return FileLoader.read_file(file_path, encoding, preprocess_fn)
         except Exception as e:
