@@ -29,12 +29,3 @@ class ChromaVectorStore:
             metadatas=metadatas,
             documents=documents
         )
-
-class VectorIndex:
-    def __init__(self, collection_name: str = "vec_docs"):
-        self.embedding_generator = EmbeddingGenerator()
-        self.vector_store = ChromaVectorStore(collection_name)
-
-    def build_index_from_nodes(self, nodes: List[Node]):
-        embeddings = self.embedding_generator.generate_embeddings(nodes)
-        self.vector_store.add_documents(nodes, embeddings)
