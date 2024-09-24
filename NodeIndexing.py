@@ -34,17 +34,7 @@ class ChromaVectorStore:
         results = self.collection.query(query_texts=[query], n_results=k)
         return [Node(text=results['documents'][i], metadata=results['metadatas'][i]) for i in range(len(results['documents']))]
 
-class NodeIndexing:
-    def __init__(self, embedding_generator: EmbeddingGenerator, vector_store: ChromaVectorStore):
-        self.embedding_generator = embedding_generator
-        self.vector_store = vector_store
 
-    def index_nodes(self, nodes: List[Node]):
-        embeddings = self.embedding_generator.generate_embeddings(nodes)
-        self.vector_store.add_documents(nodes, embeddings)
 
-    def search(self, query: str, k: int = 5) -> List[Node]:
-        return self.vector_store.query(query, k)
-    
 
         
