@@ -1,0 +1,1 @@
+# Creating and storing embeddings in Vector database
