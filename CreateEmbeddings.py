@@ -43,5 +43,29 @@ class ChromaVectorStore:
             metadatas=metadatas,
             documents=documents
         )
+    def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+        """
+        Searches both FAISS and ChromaDB indices for the top_k nearest neighbors to the query.
 
+        Args:
+            query (str): The query text.
+            top_k (int, optional): Number of top similar vectors to retrieve. Defaults to 5.
+
+        Returns:
+            List[Dict[str, Any]]: List of metadata for the top_k nearest neighbors.
+        """
+        query_embedding = self.embed_nodes([{'text': query, 'metadata': {}}])[0]
+
+        results = []
+
+        if self.use_faiss:
+            faiss_indices = self.search_faiss(query_embedding, top_k)
+            # FAISS does not store metadata; user needs to map indices to nodes externally
+            results.extend([{'faiss_index': idx} for idx in faiss_indices])
+
+        if self.use_chroma:
+            chroma_results = self.search_chromadb(query_embedding, top_k)
+            results.extend(chroma_results)
+
+        return results
     
