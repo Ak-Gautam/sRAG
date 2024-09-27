@@ -44,11 +44,4 @@ class ChromaVectorStore:
             documents=documents
         )
 
-    def search(self, query_embedding: np.ndarray, k: int = 5) -> List[Tuple[str, float]]:
-        results = self.collection.query(
-            query_embeddings=query_embedding,
-            n_results=k
-        )
-        # Return a list of tuples (document_id, score)
-        return list(zip(results['ids'][0], results['distances'][0]))
     
