@@ -11,6 +11,7 @@ import faiss
 import numpy as np
 import chromadb
 from chromadb.config import Settings
+from ChunkNode import Node
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -279,7 +280,7 @@ class EmbeddingIndexer:
             )
         ]
 
-    def index_nodes(self, nodes: List[Dict[str, Any]]):
+    def index_nodes(self, nodes: List[Node]):
         """
         Processes nodes by generating embeddings and indexing them.
 
@@ -287,6 +288,7 @@ class EmbeddingIndexer:
             nodes (List[Dict[str, Any]]): A list of node dictionaries with 'text' and 'metadata'.
         """
         logger.info("Starting indexing process for nodes.")
+        nodes = [{"text": node.text, "metadata": node.metadata} for node in nodes]
         embeddings = self.embed_nodes(nodes)
         # Check if node IDs exist in metadata; if not, assign unique IDs
         for idx, node in enumerate(nodes):
