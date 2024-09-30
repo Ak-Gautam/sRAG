@@ -11,7 +11,6 @@ from ChunkNode import Node
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class VectorStore:
     """Manages indexing and retrieval from vector databases."""
 
@@ -22,7 +21,7 @@ class VectorStore:
         self.index_path = index_path
 
         if self.vector_store_type == "faiss":
-            self.index = faiss.IndexFlatL2(768)
+            self.index = faiss.IndexFlatL2(768)  # Initialize with default dimension, change later
             logger.info("Initialized FAISS index.")
         elif self.vector_store_type == "chroma":
             self.client = chromadb.PersistentClient(path=chroma_persist_dir)
@@ -34,47 +33,43 @@ class VectorStore:
     def index_chunks(self, chunks: List[Node]):
         """Indexes chunks of text."""
         if self.vector_store_type == "faiss":
-            
             embeddings = np.array([chunk.embedding for chunk in chunks]).astype('float32')
-            if self.index.d != embeddings.shape[1]: 
+            if self.index.d != embeddings.shape[1]:  # Set/reset dimension if needed
                 self.index = faiss.IndexFlatL2(embeddings.shape[1])
             self.index.add(embeddings)
             faiss.write_index(self.index, self.index_path)
             logger.info(f"Indexed {len(chunks)} chunks in FAISS and saved to {self.index_path}.")
         elif self.vector_store_type == "chroma":
             ids = [chunk.metadata.get('node_id', str(i)) for i, chunk in enumerate(chunks)]
-            embeddings = [chunk.embedding.tolist() for chunk in chunks]
-            metadatas = [chunk.metadata for chunk in chunks]
+            embeddings = [chunk.embedding.tolist() for chunk in chunks]  # ChromaDB expects lists
+            metadatas = [chunk.metadata for chunk in chunks]  # Pass metadata to ChromaDB
             documents = [chunk.text for chunk in chunks]
             self.collection.add(
                 ids=ids,
                 embeddings=embeddings,
                 metadatas=metadatas,
-                documents=documents # Now we include full text in ChromaDB
+                documents=documents
             )
             logger.info(f"Indexed {len(chunks)} chunks in ChromaDB.")
-
 
     def search(self, query_embedding: np.ndarray, top_k: int = 5) -> List[Dict[str, Any]]:
         """Searches the vector store for similar chunks."""
         if self.vector_store_type == "faiss":
             query_embedding = query_embedding.reshape(1, -1).astype('float32')
             _, indices = self.index.search(query_embedding, top_k)
-            # FAISS returns only indices; need to map back to chunks
-            results = [{'faiss_index': idx} for idx in indices[0]]
+            results = [{'faiss_index': int(idx)} for idx in indices[0]]
             logger.info(f"FAISS search returned {len(results)} results.")
         elif self.vector_store_type == "chroma":
             results = self.collection.query(
                 query_embeddings=[query_embedding.tolist()],
                 n_results=top_k,
-                include=["metadatas", "distances", "documents"]  # Include metadatas and distances
+                include=["metadatas", "distances", "documents"]
             )
-            # Restructure ChromaDB result for consistency:
             results = [
                 {
                     "node_id": result_id,
                     "metadata": metadata,
-                    "score": 1 - distance, # Calculate Similarity score
+                    "score": 1 - distance,
                     "document": doc
                 }
                 for result_id, metadata, distance, doc in zip(
@@ -87,7 +82,7 @@ class VectorStore:
     def load_index(self):
         if self.vector_store_type == "faiss":
             if os.path.exists(self.index_path):
-                self.index = faiss.read_index(self.index_path)  # Load FAISS index
+                self.index = faiss.read_index(self.index_path)
                 logger.info(f"Loaded FAISS index from {self.index_path}")
             else:
                 logger.warning(f"Index not found at {self.index_path}")
