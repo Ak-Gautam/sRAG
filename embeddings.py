@@ -1,4 +1,5 @@
 # embeddings.py
+from typing import List
 import torch
 from transformers import AutoTokenizer, AutoModel
 import numpy as np
@@ -18,7 +19,6 @@ class Embeddings:
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self.model = AutoModel.from_pretrained(self.model_name).to(self.device)
         self.model.eval()
-
 
     def embed(self, texts: List[str], batch_size: int = 4) -> np.ndarray:
         """
