@@ -1,9 +1,10 @@
 # indexing.py
+
+import os
 import faiss
 import chromadb
-import numpy as np
 import logging
-import os
+import numpy as np
 from typing import List, Dict, Any
 from ChunkNode import Node
 
@@ -35,8 +36,9 @@ class VectorStore:
         """Indexes chunks of text."""
         if self.vector_store_type == "faiss":
             embeddings = np.array([chunk.embedding for chunk in chunks]).astype('float32')
-            if self.index.d != embeddings.shape[1]:  # Set/reset dimension if needed
+            if self.index is None or self.index.d != embeddings.shape[1]:  # Check if index needs to be created or reset
                 self.index = faiss.IndexFlatL2(embeddings.shape[1])
+                logger.info("Created/reset FAISS index with correct dimension.")
             self.index.add(embeddings)
             faiss.write_index(self.index, self.index_path)
             logger.info(f"Indexed {len(chunks)} chunks in FAISS and saved to {self.index_path}.")
