@@ -79,6 +79,12 @@ class VectorStore:
             logger.info(f"ChromaDB search returned {len(results)} results.")
         return results
 
+    def save_index(self):
+        if self.vector_store_type == "faiss":
+          faiss.write_index(self.index, self.index_path)
+          logger.info(f"Saved FAISS index to {self.index_path}")
+
+
     def load_index(self):
         if self.vector_store_type == "faiss":
             if os.path.exists(self.index_path):
@@ -86,4 +92,3 @@ class VectorStore:
                 logger.info(f"Loaded FAISS index from {self.index_path}")
             else:
                 logger.warning(f"Index not found at {self.index_path}")
-        # No explicit load needed for ChromaDB
