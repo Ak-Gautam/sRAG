@@ -17,7 +17,7 @@ class Embeddings:
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"Initializing Embeddings with model: {self.model_name} on device: {self.device}")
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.model = AutoModel.from_pretrained(self.model_name).to(self.device)
+        self.model = AutoModel.from_pretrained(self.model_name, trust_remote_code=True).to(self.device)
         self.model.eval()
 
     def embed(self, texts: List[str], batch_size: int = 4) -> np.ndarray:
@@ -39,6 +39,9 @@ class Embeddings:
                 model_output = self.model(**encoded_input)
                 batch_embeddings = self.mean_pooling(model_output, encoded_input['attention_mask']).cpu().numpy()
                 all_embeddings.append(batch_embeddings)
+                expected_dim = self.model.config.hidden_size
+                if batch_embeddings.shape[1] != expected_dim:
+                    raise ValueError(f"Unexpected embedding dimension. Expected {expected_dim}, but got {batch_embeddings.shape[1]}.")
         return np.concatenate(all_embeddings, axis=0)
 
     @staticmethod
