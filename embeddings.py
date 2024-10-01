@@ -1,13 +1,16 @@
 # embeddings.py
-from typing import List
+
 import torch
-from transformers import AutoTokenizer, AutoModel
-import numpy as np
 import logging
+import numpy as np
+from typing import List
+from transformers import AutoTokenizer, AutoModel
+from ChunkNode import Node  # Import the Node class
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class Embeddings:
     """Handles embedding generation using Hugging Face models."""
@@ -39,10 +42,25 @@ class Embeddings:
                 model_output = self.model(**encoded_input)
                 batch_embeddings = self.mean_pooling(model_output, encoded_input['attention_mask']).cpu().numpy()
                 all_embeddings.append(batch_embeddings)
-                expected_dim = self.model.config.hidden_size
-                if batch_embeddings.shape[1] != expected_dim:
-                    raise ValueError(f"Unexpected embedding dimension. Expected {expected_dim}, but got {batch_embeddings.shape[1]}.")
         return np.concatenate(all_embeddings, axis=0)
+
+
+    def embed_nodes(self, nodes: List[Node], batch_size: int = 4) -> List[Node]:
+        """
+        Generates embeddings for a list of nodes and updates the nodes in-place.
+
+        Args:
+            nodes (List[Node]): List of Node objects.
+            batch_size (int, optional): Batch size for embedding computation. Defaults to 4.
+
+        Returns:
+            List[Node]: The same list of Node objects, with their 'embedding' attribute updated.
+        """
+        texts = [node.text for node in nodes]
+        embeddings = self.embed(texts, batch_size=batch_size) # Reusing the embed method
+        for node, embedding in zip(nodes, embeddings):
+            node.embedding = embedding
+        return nodes
 
     @staticmethod
     def mean_pooling(model_output, attention_mask):
@@ -55,10 +73,11 @@ class Embeddings:
 
     @staticmethod
     def cosine_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> np.ndarray:
+        """Computes cosine similarity between two embeddings or batches of embeddings."""
         embedding1_norm = np.linalg.norm(embedding1, axis=-1, keepdims=True)
         embedding2_norm = np.linalg.norm(embedding2, axis=-1, keepdims=True)
 
-        embedding1_norm[embedding1_norm == 0] = 1e-9
+        embedding1_norm[embedding1_norm == 0] = 1e-9  # Avoid division by zero
         embedding2_norm[embedding2_norm == 0] = 1e-9
 
         return np.dot(embedding1, embedding2.T) / (embedding1_norm * embedding2_norm.T)
