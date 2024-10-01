@@ -51,6 +51,11 @@ class Embeddings:
         return sum_embeddings / sum_mask
 
     @staticmethod
-    def cosine_similarity(embedding1, embedding2):
-        """Calculates cosine similarity between two embeddings."""
-        return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
+    def cosine_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> np.ndarray:
+        embedding1_norm = np.linalg.norm(embedding1, axis=-1, keepdims=True)
+        embedding2_norm = np.linalg.norm(embedding2, axis=-1, keepdims=True)
+
+        embedding1_norm[embedding1_norm == 0] = 1e-9
+        embedding2_norm[embedding2_norm == 0] = 1e-9
+
+        return np.dot(embedding1, embedding2.T) / (embedding1_norm * embedding2_norm.T)
