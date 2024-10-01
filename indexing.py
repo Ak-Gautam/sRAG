@@ -14,14 +14,15 @@ logger = logging.getLogger(__name__)
 class VectorStore:
     """Manages indexing and retrieval from vector databases."""
 
-    def __init__(self, vector_store_type: str = "faiss", index_path: str = "faiss_index.bin", chroma_persist_dir: str = "chromadb"):
+    def __init__(self, vector_store_type: str = "faiss", index_path: str = "faiss_index.bin", chroma_persist_dir: str = "chromadb", embedding_dim: int = None):
         """Initializes the VectorStore with either FAISS or ChromaDB."""
 
         self.vector_store_type = vector_store_type
         self.index_path = index_path
+        self.embedding_dim = embedding_dim
 
         if self.vector_store_type == "faiss":
-            self.index = faiss.IndexFlatL2(768)  # Initialize with default dimension, change later
+            self.index = None  # will be initialized later with the right embedding dimensions
             logger.info("Initialized FAISS index.")
         elif self.vector_store_type == "chroma":
             self.client = chromadb.PersistentClient(path=chroma_persist_dir)
