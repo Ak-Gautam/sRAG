@@ -234,7 +234,23 @@ class DataGen:
             else:
                 logger.warning("Failed to generate prompt for a dataset entry.")
 
+        if not prompts:
+            logger.error("No prompts generated. Cannot proceed with dataset generation.")
+            return
 
+        logger.info(f"Generated {len(prompts)} prompts for dataset generation.")
+
+        # Generate dataset entries using LLM in batches
+        generated_entries = self.llm.generate_dataset(
+            prompts=prompts,
+            max_length=512,
+            temperature=0.7,
+            top_p=0.9,
+            num_return_sequences=1,
+            batch_size=self.batch_size
+        )
+
+        logger.info(f"Generated {len(generated_entries)} dataset entries.")
 
         # Structure the generated entries according to the example dataset fields
         structured_entries = []
