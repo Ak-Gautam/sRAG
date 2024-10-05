@@ -1,10 +1,8 @@
 # pipeline.py
-
 import logging
-from typing import List, Dict, Any, Optional
-
-from DocLoader import FileLoader, Document
-from ChunkNode import get_chunk_splitter, ChunkSplitter
+from typing import List, Dict, Any, Optional, Generator
+from DocLoader import FileLoader
+from ChunkNode import get_chunk_splitter, ChunkSplitter, Node  # Correct import
 from embeddings import Embeddings
 from indexing import VectorStore
 from llm import LLM
@@ -14,217 +12,90 @@ from PromptManager import PromptManager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-class Pipeline:
-    """
-    Orchestrates the Retrieval-Augmented Generation (RAG) workflow.
-    Handles document processing, embedding, indexing, query handling, and response generation.
-    """
-
+class RAGPipeline:  # More descriptive class name
     def __init__(
         self,
-        document_directory: str,
-        chunking_strategy: str = 'overlap',
-        chunking_kwargs: Optional[Dict[str, Any]] = None,
-        embedding_model_name: str = "nomic-ai/nomic-embed-text-v1.5",
-        vector_store_type: str = "faiss",
-        vector_store_kwargs: Optional[Dict[str, Any]] = None,
-        llm_model_name: str = "gpt2",
-        llm_task: str = "text-generation",
-        prompt_template: str = "rag_simple",
-        use_gpu: bool = True,
+        file_loader: FileLoader,
+        chunk_splitter: ChunkSplitter,
+        embeddings: Embeddings,
+        vector_store: VectorStore,
+        llm: LLM,
+        prompt_manager: PromptManager,
+        default_prompt_template: str = "rag_simple",
     ):
-        """
-        Initializes the Pipeline with specified configurations.
+        self.file_loader = file_loader
+        self.chunk_splitter = chunk_splitter
+        self.embeddings = embeddings
+        self.vector_store = vector_store
+        self.llm = llm
+        self.prompt_manager = prompt_manager
+        self.default_prompt_template = default_prompt_template
 
-        Args:
-            document_directory (str): Path to the directory containing documents.
-            chunking_strategy (str): Strategy for chunking ('token', 'overlap', 'paragraph').
-            chunking_kwargs (Optional[Dict[str, Any]]): Additional arguments for the chunk splitter.
-            embedding_model_name (str): Hugging Face model name for embeddings.
-            vector_store_type (str): Type of vector store ('faiss' or 'chroma').
-            vector_store_kwargs (Optional[Dict[str, Any]]): Additional arguments for the vector store.
-            llm_model_name (str): Hugging Face model name for the LLM.
-            llm_task (str): Task for the LLM ('text-generation', 'translation', etc.).
-            prompt_template (str): Name of the prompt template to use.
-            use_gpu (bool): Whether to use GPU for the LLM.
-        """
-        logger.info("Initializing Pipeline.")
 
-        # Initialize DocLoader
-        self.file_loader = FileLoader(document_directory)
-        logger.info(f"FileLoader initialized for directory: {document_directory}")
-
-        # Initialize ChunkSplitter
-        if chunking_kwargs is None:
-            chunking_kwargs = {}
-        self.chunk_splitter: ChunkSplitter = get_chunk_splitter(
-            strategy=chunking_strategy, **chunking_kwargs
-        )
-        logger.info(f"ChunkSplitter initialized with strategy: {chunking_strategy}")
-
-        # Initialize Embeddings
-        self.embeddings = Embeddings(model_name=embedding_model_name)
-        logger.info(f"Embeddings initialized with model: {embedding_model_name}")
-
-        # Initialize VectorStore
-        if vector_store_kwargs is None:
-            vector_store_kwargs = {}
-        self.vector_store = VectorStore(
-            vector_store_type=vector_store_type, **vector_store_kwargs
-        )
-        logger.info(f"VectorStore initialized with type: {vector_store_type}")
-
-        # Initialize PromptManager
-        self.prompt_manager = PromptManager()
-        logger.info("PromptManager initialized.")
-
-        # Initialize LLM
-        self.llm = LLM(model_name=llm_model_name, use_gpu=use_gpu, task=llm_task)
-        logger.info(f"LLM initialized with model: {llm_model_name} for task: {llm_task}")
-
-        # Set prompt template
-        self.prompt_template = prompt_template
-        logger.info(f"Using prompt template: {prompt_template}")
-
-    def process_documents(
+    def load_and_index(
         self,
+        directory_path: str,  # Moved directory_path here
         recursive: bool = False,
         ext: Optional[List[str]] = None,
         exc: Optional[List[str]] = None,
         filenames: Optional[List[str]] = None,
         preprocess_fn: Optional[Any] = None,
         max_workers: int = None,
-    ) -> List[Any]:
-        """
-        Loads, chunks, embeds, and indexes documents.
+    ):
+        """Loads, chunks, embeds, and indexes documents from the specified directory."""
+        documents = self.file_loader.load_files(recursive, ext, exc, filenames, max_workers, preprocess_fn)
+        chunks = self.chunk_splitter.get_nodes_from_documents(documents)
+        self.embeddings.embed_nodes(chunks)
+        self.vector_store.index_chunks(chunks)
+        logger.info(f"Loaded, chunked, embedded, and indexed {len(chunks)} chunks from {directory_path}")
 
-        Args:
-            recursive (bool): Whether to load files recursively.
-            ext (Optional[List[str]]): List of file extensions to include.
-            exc (Optional[List[str]]): List of file extensions to exclude.
-            filenames (Optional[List[str]]): Specific filenames to include.
-            preprocess_fn (Optional[Any]): Preprocessing function to apply to text.
-            max_workers (int): Number of worker processes for parallel processing.
-
-        Returns:
-            List[Any]: List of indexed nodes.
-        """
-        logger.info("Starting document processing pipeline.")
-
-        # Step 1: Load Documents
-        documents: List[Document] = self.file_loader.load_files(
-            recursive=recursive,
-            ext=ext,
-            exc=exc,
-            filenames=filenames,
-            max_workers=max_workers,
-            preprocess_fn=preprocess_fn,
-        )
-        logger.info(f"Loaded {len(documents)} documents.")
-
-        if not documents:
-            logger.warning("No documents loaded. Exiting processing pipeline.")
-            return []
-
-        # Step 2: Chunk Documents
-        nodes = self.chunk_splitter.get_nodes_from_documents(documents)
-        logger.info(f"Chunked documents into {len(nodes)} nodes.")
-
-        if not nodes:
-            logger.warning("No nodes generated from documents.")
-            return []
-
-        # Step 3: Generate Embeddings
-        nodes_with_embeddings = self.embeddings.embed_nodes(nodes)
-        logger.info("Generated embeddings for all nodes.")
-
-        # Step 4: Index Embeddings
-        self.vector_store.index_chunks(nodes_with_embeddings)
-        logger.info("Indexed all node embeddings.")
-
-        logger.info("Document processing pipeline completed successfully.")
-        return nodes_with_embeddings
-
-    def handle_query(
+    def run(
         self,
         query: str,
         top_k: int = 5,
         prompt_template: Optional[str] = None,
-        max_length: int = 512,
-        temperature: float = 0.7,
-        top_p: float = 0.9,
-    ) -> str:
+        **llm_kwargs  # Use **llm_kwargs
+    ) -> Union[str, Generator]: # Changed return type to also allow for generator objects
+
         """
-        Processes a user query and generates a response using the RAG pipeline.
+        Processes a user query and generates a response.
 
         Args:
             query (str): The user's query.
-            top_k (int): Number of top relevant chunks to retrieve.
-            prompt_template (Optional[str]): Specific prompt template to use.
-            max_length (int): Maximum length of the generated response.
-            temperature (float): Sampling temperature for the LLM.
-            top_p (float): Nucleus sampling probability for the LLM.
+            top_k (int): The number of top similar chunks to retrieve.
+            prompt_template (Optional[str]):  Name of the prompt template to use. If None, uses the default.
 
         Returns:
-            str: Generated response from the LLM.
+            Union[str, Generator]: The generated response string or a generator of strings for streaming.
+                                    If 'stream_output' is True in 'llm_kwargs', returns a generator.
         """
-        logger.info(f"Handling query: {query}")
+        query_embedding = self.embeddings.embed([query])[0]  # Embed the query
+        results = self.vector_store.search(query_embedding, top_k=top_k)  # Search vector store
 
-        # Step 1: Embed the Query
-        query_embedding = self.embeddings.embed([query])[0]
-        logger.info("Generated embedding for the query.")
 
-        # Step 2: Retrieve Relevant Chunks
-        retrieved_chunks = self.vector_store.search(query_embedding, top_k=top_k)
-        logger.info(f"Retrieved {len(retrieved_chunks)} relevant chunks.")
+        # Use prompt_template if provided, otherwise use default
+        if not prompt_template:
+            prompt_template = self.default_prompt_template
 
-        if not retrieved_chunks:
-            logger.warning("No relevant chunks found for the query.")
-            return "I'm sorry, I couldn't find any relevant information to answer your question."
 
-        # Extract context texts from retrieved chunks
-        context_texts = [res['document'] for res in retrieved_chunks]
-
-        # Step 3: Construct the Prompt
-        template_to_use = prompt_template if prompt_template else self.prompt_template
-        prompt = self.prompt_manager.get_prompt(
-            template_name=template_to_use,
-            variables={
-                "context": "\n".join(context_texts),
-                "query": query
-            }
+        # Create prompt (updated to use PromptManager correctly)
+        prompt = self.prompt_manager.create_prompt(
+            template_name=prompt_template, query=query, context=results
         )
 
-        if not prompt:
-            logger.error("Failed to construct prompt. Returning default response.")
-            return "I'm sorry, I couldn't process your request at the moment."
+        if not prompt: # Check if create_prompt did not return an empty string due to error
+            logger.error("Prompt creation failed. Returning empty string.")
+            return ""  # Return empty string on prompt failure
 
-        logger.info(f"Constructed prompt using template '{template_to_use}'.")
+        # Generate response (updated to handle streaming)
+        response = self.llm.generate(prompt, **llm_kwargs)
 
-        # Step 4: Generate the Response
-        response = self.llm.generate_rag_response(
-            query=query,
-            context=context_texts,
-            prompt_template=None if template_to_use == "rag_simple" else prompt,
-            max_length=max_length,
-            temperature=temperature,
-            top_p=top_p,
-        )
-
-        logger.info("Generated response from LLM.")
         return response
 
+
+
     def save_index(self):
-        """
-        Saves the current state of the vector index to disk.
-        """
-        logger.info("Saving the vector index.")
         self.vector_store.save_index()
 
     def load_index(self):
-        """
-        Loads the vector index from disk.
-        """
-        logger.info("Loading the vector index.")
         self.vector_store.load_index()
