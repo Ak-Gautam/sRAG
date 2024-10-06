@@ -1,20 +1,26 @@
-# indexing.py
 import os
 import faiss
 import logging
 import chromadb
 import numpy as np
 from typing import List, Dict, Any
-from srag.chunk_node import Node 
+from chunk_node import Node  # Updated import
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class VectorStore:
     """Manages indexing and retrieval from vector databases."""
 
-    def __init__(self, vector_store_type: str = "faiss", index_path: str = "faiss_index.bin", chroma_persist_dir: str = "chromadb", embedding_dim: int = None):
+    def __init__(
+        self, 
+        vector_store_type: str = "faiss", 
+        index_path: str = "faiss_index.bin", 
+        chroma_persist_dir: str = "chromadb", 
+        embedding_dim: int = None
+    ):
         """Initializes the VectorStore with either FAISS or ChromaDB."""
 
         self.vector_store_type = vector_store_type
@@ -22,7 +28,7 @@ class VectorStore:
         self.embedding_dim = embedding_dim
 
         if self.vector_store_type == "faiss":
-            self.index = None  # will be initialized later with the right embedding dimensions
+            self.index = None  # Initialized later 
             logger.info("Initialized FAISS index.")
         elif self.vector_store_type == "chroma":
             self.client = chromadb.PersistentClient(path=chroma_persist_dir)
@@ -31,7 +37,7 @@ class VectorStore:
         else:
             raise ValueError("Invalid vector_store_type. Choose 'faiss' or 'chroma'.")
 
-    def index_chunks(self, chunks: List[Node]):
+    def index(self, chunks: List[Node]):
         """Indexes chunks of text."""
         if self.vector_store_type == "faiss":
             embeddings = np.array([chunk.embedding for chunk in chunks]).astype('float32')
@@ -81,13 +87,15 @@ class VectorStore:
             logger.info(f"ChromaDB search returned {len(results)} results.")
         return results
 
-    def save_index(self):
-        if self.vector_store_type == "faiss":
+    def save(self):
+        """Saves the Faiss index if it exists"""
+        if self.vector_store_type == "faiss" and self.index: 
           faiss.write_index(self.index, self.index_path)
           logger.info(f"Saved FAISS index to {self.index_path}")
 
 
-    def load_index(self):
+    def load(self):
+        """Loads the Faiss index if it exists"""
         if self.vector_store_type == "faiss":
             if os.path.exists(self.index_path):
                 self.index = faiss.read_index(self.index_path)
