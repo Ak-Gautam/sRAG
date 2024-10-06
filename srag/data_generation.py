@@ -1,36 +1,39 @@
-# DataGen.py
 import logging
 import json
 import csv
 import os
 from typing import List, Dict, Any, Optional, Union, Iterator
-
-from DocLoader import FileLoader
+from document_loader import DocumentLoader
 from llm import LLM
-from PromptManager import PromptManager
-from ChunkNode import get_chunk_splitter, ChunkSplitter, Node
+from prompt_manager import PromptManager
+from chunk_node import get_chunk_splitter, ChunkSplitter, Node
 from embeddings import Embeddings
-from indexing import VectorStore  # Import VectorStore if needed
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class DataGenerator:  # Class name changed for consistency
+
+class DataGenerator:  
+    """
+    Generates datasets using LLMs, knowledge sources, and example datasets.
+    """
     def __init__(
         self,
-        file_loader: FileLoader,  # Using dependency injection
-        chunk_splitter: ChunkSplitter,  # Using dependency injection
-        embeddings: Embeddings,  # Using dependency injection
-        llm: LLM,  # Using dependency injection
-        prompt_manager: PromptManager,  # Using dependency injection
-        example_dataset_path: str,  # More descriptive name
+        file_loader: DocumentLoader,  
+        chunk_splitter: ChunkSplitter,  
+        embeddings: Embeddings,  
+        llm: LLM, 
+        prompt_manager: PromptManager,  
+        example_dataset_path: str,  
         output_format: str = "json",
         output_path: str = "generated_dataset.json",
-        batch_size: int = 8,  # Keeping batch size for other potential uses
-        default_prompt_template: str = "dataset_instruction" # For Data Generation Tasks
+        batch_size: int = 8,  
+        default_prompt_template: str = "dataset_instruction" 
     ):
-
+        """
+        Initializes the DataGenerator with necessary components.
+        """
         self.file_loader = file_loader
         self.chunk_splitter = chunk_splitter
         self.embeddings = embeddings
@@ -43,19 +46,17 @@ class DataGenerator:  # Class name changed for consistency
         self.batch_size = batch_size
         self.default_prompt_template = default_prompt_template
 
-
-    def load_knowledge(self, directory_path: str, **kwargs) -> List[Node]:  # Added type hint
+    def load_knowledge(self, directory_path: str, **kwargs) -> List[Node]:  
         """Loads, chunks, and embeds knowledge documents."""
 
-        documents = self.file_loader.load_files(directory_path=directory_path, **kwargs)  # Passing directory_path
-        chunks = self.chunk_splitter.get_nodes_from_documents(documents)
-        self.embeddings.embed_nodes(chunks) # No need to return this
-        return chunks # returning chunks for later use
+        documents = self.file_loader.load(directory_path=directory_path, **kwargs)  
+        chunks = self.chunk_splitter.split(documents)
+        self.embeddings.embed_nodes(chunks) 
+        return chunks 
 
-
-    def _load_example_dataset(self) -> List[Dict[str, Any]]:  # Made private
+    def _load_example_dataset(self) -> List[Dict[str, Any]]:  
         """Loads the example dataset."""
-        if not os.path.exists(self.example_dataset_path):  # Check for file existence
+        if not os.path.exists(self.example_dataset_path): 
             raise FileNotFoundError(f"Example dataset file not found: {self.example_dataset_path}")
 
         try:
@@ -67,11 +68,9 @@ class DataGenerator:  # Class name changed for consistency
                     reader = csv.DictReader(f)
                     return list(reader)
             else:
-                raise ValueError("Unsupported example dataset format. Use JSON or CSV.")  # Raise ValueError for incorrect format
-        except Exception as e:  # Catch broader exceptions during file loading
-            raise RuntimeError(f"Error loading example dataset: {e}") from e  # Chain exceptions for better debugging
-
-
+                raise ValueError("Unsupported example dataset format. Use JSON or CSV.")  
+        except Exception as e:  
+            raise RuntimeError(f"Error loading example dataset: {e}") from e  
 
     def generate_dataset(
         self,
@@ -82,11 +81,10 @@ class DataGenerator:  # Class name changed for consistency
     ):
         """Generates a dataset using knowledge nodes and the example dataset format."""
 
-        examples = self._load_example_dataset() # Load examples
+        examples = self._load_example_dataset() 
 
         if not examples:
-            raise ValueError("Example dataset is empty.")  # Raise error if example dataset is empty
-
+            raise ValueError("Example dataset is empty.")  
 
         # Default prompt_template handling
         if not prompt_template:
@@ -96,7 +94,7 @@ class DataGenerator:  # Class name changed for consistency
         def prompt_generator(num: int, knowledge: List[Node], template_name: str) -> Iterator[str]:
             """Generate prompts from knowledge nodes in a streaming way"""
             for _ in range(num):
-                knowledge_node = knowledge[_ % len(knowledge)] # reusing knowledge nodes to reach the desired size
+                knowledge_node = knowledge[_ % len(knowledge)] # reusing knowledge nodes 
                 variables = {"instruction": "Generate a question and answer pair based on the following context.",
                                "input_data": knowledge_node.text}
                 prompt = self.prompt_manager.create_prompt(template_name=template_name, **variables)
@@ -107,27 +105,25 @@ class DataGenerator:  # Class name changed for consistency
                     continue
 
         # Generate dataset entries using LLM (streaming)
-        generated_entries = self.llm.generate(list(prompt_generator(num_entries, knowledge_nodes, prompt_template)), stream_output=True, **llm_kwargs)  # Corrected generate call
-
+        generated_entries = self.llm.generate(list(prompt_generator(num_entries, knowledge_nodes, prompt_template)), stream_output=True, **llm_kwargs)  
 
         # Function to structure generated entries
         def structure_entry(entry: str):
-            parts = entry.split('\n')  # Split by newline. Handle this split according to your generation format
+            parts = entry.split('\n')  # Split by newline 
             if len(parts) >= 2:
-                return {"question": parts[0].strip(), "answer": " ".join(parts[1:]).strip()} # Assuming output has minimum two newline-separated parts. Customize this if your output is different
+                return {"question": parts[0].strip(), "answer": " ".join(parts[1:]).strip()}  
             else:
                 logger.warning("Generated entry does not conform to expected format. Skipping.")
-                return None  # Indicate invalid entry
+                return None  
 
-        # Structure generated entries (using a list comprehension for conciseness)
+        # Structure generated entries 
         structured_entries = [
             structured_entry(entry) for entry in generated_entries if structured_entry(entry)
         ]
 
-        self._save_dataset(structured_entries)  # Private save method
+        self._save_dataset(structured_entries)  
 
-
-    def _save_dataset(self, dataset: List[Dict[str, Any]]):  # Made private
+    def _save_dataset(self, dataset: List[Dict[str, Any]]):  
         """Saves the generated dataset."""
 
         if not dataset:
@@ -136,15 +132,15 @@ class DataGenerator:  # Class name changed for consistency
 
         try:
             if self.output_format == "json":
-                with open(self.output_path, "w", encoding="utf-8") as f:  # Open in text mode for JSON
+                with open(self.output_path, "w", encoding="utf-8") as f:  
                     json.dump(dataset, f, ensure_ascii=False, indent=4)
             elif self.output_format == "csv":
-                fieldnames = dataset[0].keys()  # Get fieldnames from the first entry
-                with open(self.output_path, "w", newline="", encoding="utf-8") as f: # Added newline='' to prevent extra blank lines in CSV
+                fieldnames = dataset[0].keys()  
+                with open(self.output_path, "w", newline="", encoding="utf-8") as f: 
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     writer.writeheader()
                     writer.writerows(dataset)
             else:
-                raise ValueError("Unsupported output format. Use 'json' or 'csv'.")  # Raise error instead of logging
-        except Exception as e:  # Catch broader exceptions during file saving
-            raise RuntimeError(f"Error saving dataset: {e}") from e # Raise exception if saving fails
+                raise ValueError("Unsupported output format. Use 'json' or 'csv'.")  
+        except Exception as e:  
+            raise RuntimeError(f"Error saving dataset: {e}") from e 
