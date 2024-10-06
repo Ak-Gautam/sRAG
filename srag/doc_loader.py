@@ -1,4 +1,3 @@
-# DocLoader.py
 import os
 import uuid
 import fitz
@@ -10,28 +9,29 @@ from pathlib import Path
 from typing import List, Dict, Optional, Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-# Configure logging for better error tracking
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class Document:
     """Represents a single document with its content and metadata."""
 
-    def __init__(self, id: str, metadata: Dict, text: str):
-        self.id = id
+    def __init__(self, document_id: str, metadata: Dict, text: str):
+        self.document_id = document_id
         self.metadata = metadata
         self.text = text
 
     def __repr__(self):
-        return f"Document(id='{self.id}', metadata={self.metadata}, text='{self.text[:20]}...')"
-        
-class FileLoader:
+        return f"Document(document_id='{self.document_id}', metadata={self.metadata}, text='{self.text[:20]}...')"
+
+
+class DocumentLoader:
     """
-    A class for loading and reading files from a directory,
-    returning documents with metadata and text content.
+    Loads and reads files from a directory, returning documents with 
+    metadata and text content.
     """
 
-    # Define supported code MIME types
     CODE_MIME_TYPES = {
         'text/x-python': '.py',
         'text/javascript': '.js',
@@ -48,40 +48,48 @@ class FileLoader:
     def __init__(self, directory_path: str, encoding: str = "utf-8"):
         self.directory_path = directory_path
         self.encoding = encoding
-        # Extend mimetypes with additional code types
         self._initialize_mimetypes()
 
     def _initialize_mimetypes(self):
-        # Ensure code MIME types are recognized
+        """Ensures code MIME types are recognized."""
         for mime, ext in self.CODE_MIME_TYPES.items():
             mimetypes.add_type(mime, ext)
 
     @staticmethod
-    def read_file(file_path: Path, encoding: str, preprocess_fn: Optional[Callable[[str], str]] = None) -> List[Document]:
+    def _read_file(
+        file_path: Path, 
+        encoding: str, 
+        preprocess_fn: Optional[Callable[[str], str]] = None
+    ) -> List[Document]:
+        """Reads a file based on its MIME type."""
         mime_type, _ = mimetypes.guess_type(str(file_path))
 
         read_methods = {
-            "application/pdf": FileLoader.read_pdf,
-            "text/markdown": FileLoader.read_markdown,
-            "text/plain": FileLoader.read_text,
+            "application/pdf": DocumentLoader._read_pdf,
+            "text/markdown": DocumentLoader._read_markdown,
+            "text/plain": DocumentLoader._read_text,
             # code MIME types
-            "text/x-python": FileLoader.read_code,
-            "text/javascript": FileLoader.read_code,
-            "application/typescript": FileLoader.read_code,
-            "text/x-java-source": FileLoader.read_code,
-            "text/x-c++src": FileLoader.read_code,
-            "text/x-csrc": FileLoader.read_code,
-            "text/x-ruby": FileLoader.read_code,
-            "text/x-go": FileLoader.read_code,
-            "text/x-shellscript": FileLoader.read_code,
-
+            "text/x-python": DocumentLoader._read_code,
+            "text/javascript": DocumentLoader._read_code,
+            "application/typescript": DocumentLoader._read_code,
+            "text/x-java-source": DocumentLoader._read_code,
+            "text/x-c++src": DocumentLoader._read_code,
+            "text/x-csrc": DocumentLoader._read_code,
+            "text/x-ruby": DocumentLoader._read_code,
+            "text/x-go": DocumentLoader._read_code,
+            "text/x-shellscript": DocumentLoader._read_code,
         }
 
-        read_method = read_methods.get(mime_type, FileLoader.read_text)
+        read_method = read_methods.get(mime_type, DocumentLoader._read_text)
         return read_method(file_path, encoding, preprocess_fn)
 
     @staticmethod
-    def read_pdf(file_path: Path, encoding: str, preprocess_fn: Optional[Callable[[str], str]] = None) -> List[Document]:
+    def _read_pdf(
+        file_path: Path, 
+        encoding: str, 
+        preprocess_fn: Optional[Callable[[str], str]] = None
+    ) -> List[Document]:
+        """Reads a PDF file."""
         documents = []
         try:
             doc = fitz.open(str(file_path))
@@ -120,11 +128,16 @@ class FileLoader:
         return documents
 
     @staticmethod
-    def read_markdown(file_path: Path, encoding: str, preprocess_fn: Optional[Callable[[str], str]] = None) -> List[Document]:
+    def _read_markdown(
+        file_path: Path, 
+        encoding: str, 
+        preprocess_fn: Optional[Callable[[str], str]] = None
+    ) -> List[Document]:
+        """Reads a Markdown file."""
         try:
             with open(file_path, encoding=encoding) as f:
                 md_content = f.read()
-            # Convert Markdown to plain text for consistency
+            # Convert Markdown to plain text 
             text = markdown.markdown(md_content)
             if preprocess_fn:
                 text = preprocess_fn(text)
@@ -132,36 +145,45 @@ class FileLoader:
             logger.error(f"Failed to read or preprocess Markdown file {file_path}: {e}")
             text = ""
 
-        return [FileLoader._create_single_document(file_path, text, 'text/markdown')]
-
+        return [DocumentLoader._create_single_document(file_path, text, 'text/markdown')]
 
     @staticmethod
-    def read_text(file_path: Path, encoding: str) -> List[Document]:
-        """Reads a plain text file and returns a list containing a single Document object."""
+    def _read_text(file_path: Path, encoding: str, preprocess_fn: Optional[Callable[[str], str]] = None) -> List[Document]:
+        """Reads a plain text file."""
         try:
             with open(file_path, encoding=encoding) as f:
                 text = f.read()
+            if preprocess_fn:
+                text = preprocess_fn(text)
         except Exception as e:
-            logger.error(f"Failed to read text file {file_path}: {e}")
+            logger.error(f"Failed to read or preprocess text file {file_path}: {e}")
             text = ""
 
-        return [FileLoader._create_single_document(file_path, text, 'text/plain')]
+        return [DocumentLoader._create_single_document(file_path, text, 'text/plain')]
+
 
     @staticmethod
-    def read_code(file_path: Path, encoding: str) -> List[Document]:
-        """Reads a code file and returns a list containing a single Document object."""
+    def _read_code(
+        file_path: Path, 
+        encoding: str, 
+        preprocess_fn: Optional[Callable[[str], str]] = None
+    ) -> List[Document]:
+        """Reads a code file."""
         try:
             with open(file_path, encoding=encoding) as f:
                 code = f.read()
+            if preprocess_fn:
+                code = preprocess_fn(code)
         except Exception as e:
             logger.error(f"Failed to read code file {file_path}: {e}")
             code = ""
 
-        return [FileLoader._create_single_document(file_path, code, mimetypes.guess_type(str(file_path))[0] or 'text/plain')]
+        mime_type = mimetypes.guess_type(str(file_path))[0] or 'text/plain'
+        return [DocumentLoader._create_single_document(file_path, code, mime_type)]
 
     @staticmethod
     def _create_single_document(file_path: Path, text: str, mime_type: str) -> Document:
-        """Helper method to create a single Document object with common metadata."""
+        """Creates a Document object with metadata."""
         file_stats = file_path.stat()
         metadata = {
             'page_label': '1',
@@ -176,7 +198,17 @@ class FileLoader:
         return Document(document_id, metadata, text)
 
     @staticmethod
-    def process_file(file_path: Path, encoding: str, ext: Optional[List[str]], exc: Optional[List[str]], filenames: Optional[List[str]], preprocess_fn: Optional[Callable[[str], str]] = None) -> List[Document]:
+    def _process_file(
+        file_path: Path, 
+        encoding: str, 
+        ext: Optional[List[str]], 
+        exc: Optional[List[str]], 
+        filenames: Optional[List[str]], 
+        preprocess_fn: Optional[Callable[[str], str]] = None
+    ) -> List[Document]:
+        """
+        Helper function to process a single file based on filtering criteria.
+        """
         # Check if the file should be processed based on filename
         if filenames is not None and file_path.name not in filenames:
             return []
@@ -190,12 +222,12 @@ class FileLoader:
                 return []
         
         try:
-            return FileLoader.read_file(file_path, encoding, preprocess_fn)
+            return DocumentLoader._read_file(file_path, encoding, preprocess_fn)
         except Exception as e:
             logger.error(f"Error reading file {file_path}: {e}")
             return []
 
-    def load_files(
+    def load(
         self,
         recursive: bool = False,
         ext: Optional[List[str]] = None,
@@ -203,7 +235,10 @@ class FileLoader:
         filenames: Optional[List[str]] = None,
         max_workers: int = os.cpu_count(),
         preprocess_fn: Optional[Callable[[str], str]] = None
-        ) -> List[Document]:
+    ) -> List[Document]:
+        """
+        Loads documents from the directory, applying optional filtering and preprocessing.
+        """
         directory = Path(self.directory_path)
         documents: List[Document] = []
 
@@ -213,7 +248,7 @@ class FileLoader:
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(
-                    self.process_file,
+                    self._process_file,
                     file_path,
                     self.encoding,
                     ext,
