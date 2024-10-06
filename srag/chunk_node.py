@@ -5,7 +5,7 @@ import fitz
 import markdown
 import re
 import nltk
-# from document_loader import Document  # Updated import
+from document_loader import Document
 
 
 class Node:
