@@ -1,11 +1,9 @@
-# embeddings.py
-
 import torch
 import logging
 import numpy as np
 from typing import List
 from transformers import AutoTokenizer, AutoModel
-from ChunkNode import Node  # Import the Node class
+from chunk_node import Node
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -44,7 +42,6 @@ class Embeddings:
                 all_embeddings.append(batch_embeddings)
         return np.concatenate(all_embeddings, axis=0)
 
-
     def embed_nodes(self, nodes: List[Node], batch_size: int = 4) -> List[Node]:
         """
         Generates embeddings for a list of nodes and updates the nodes in-place.
@@ -57,7 +54,7 @@ class Embeddings:
             List[Node]: The same list of Node objects, with their 'embedding' attribute updated.
         """
         texts = [node.text for node in nodes]
-        embeddings = self.embed(texts, batch_size=batch_size) # Reusing the embed method
+        embeddings = self.embed(texts, batch_size=batch_size)  # Reusing the embed method
         for node, embedding in zip(nodes, embeddings):
             node.embedding = embedding
         return nodes
