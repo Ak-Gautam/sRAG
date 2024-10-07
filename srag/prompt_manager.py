@@ -1,86 +1,88 @@
 import logging
-import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForCausalLM
-from typing import List, Dict, Optional, Union, Iterator, Generator
+from typing import Dict, Optional, List, Any
+from jinja2 import Template
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class LLM:
+class PromptManager:
     """
-    Wrapper for interacting with large language models (LLMs) from Hugging Face.
+    Manages prompt templates for generating prompts for LLMs.
     """
-    def __init__(self, model_name: str, use_gpu: bool = True, task: str = "text-generation", **kwargs):
-        """
-        Initializes the LLM with the specified model name and task.
-        """
-        self.model_name = model_name
-        self.task = task.lower()  # Ensure task is always lowercase
-        self.device = 0 if torch.cuda.is_available() and use_gpu else -1
-        self.kwargs = kwargs  # Store additional keyword arguments
+    def __init__(self, default_template: Optional[str] = None):  
+        """Initializes the PromptManager with predefined templates."""
+        self.templates = {}
+        self._load_predefined_templates()
+        if default_template:  
+            if default_template not in self.templates:
+                raise ValueError(f"Default template '{default_template}' not found in predefined templates.")
+            self.default_template_name = default_template
+            logger.info(f"Default template set to: {default_template}")
+        else:
+            self.default_template_name = None
 
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
+    def _load_predefined_templates(self):
+        """Loads predefined prompt templates."""
+        self.templates["rag_cot"] = (
+            "Context:\n{{ context }}\n\nQuestion: {{ query }}\nLet's think step by step:\nAnswer:"
+        )
+        self.templates["rag_simple"] = (
+            "Context:\n{{ context }}\n\nQuestion: {{ query }}\nAnswer:"
+        )
+        self.templates["dataset_instruction"] = (
+            "Instruction: {{ instruction }}\nInput: {{ input_data }}\nOutput:"
+        )
+        self.templates["dataset_reasoning"] = "Problem: {{ problem_statement }}\nSolution:"
 
+    def add_template(self, template_name: str, template_str: str):
+        """Adds a new prompt template."""
+        self.templates[template_name] = template_str 
+
+    def remove_template(self, template_name: str):
+        """Removes a prompt template."""
         try:
-            try:
-                self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name, trust_remote_code=True).to(self.device)
-                self.is_encoder_decoder = True
-            except ValueError:  
-                self.model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True).to(self.device)
-                self.is_encoder_decoder = False
-        except Exception as e:  
-            logger.error(f"Error loading model: {e}. Check if model name/path is correct.")
-            raise
+            del self.templates[template_name]
+        except KeyError:  
+            logger.warning(f"Template '{template_name}' not found.") 
 
-        self.model.eval()
-
-    def _generate_text(self, prompts: Union[str, List[str]], **generation_kwargs) -> Union[str, List[str]]:
+    def create_prompt(self, template_name: Optional[str] = None, **kwargs) -> str:
         """
-        Generates text for a single prompt or list of prompts.
+        Creates a prompt using a specified template or the default template.
         """
 
-        if isinstance(prompts, str):
-            input_ = self.tokenizer(prompts, return_tensors="pt").to(self.device)
-            output = self.model.generate(**input_, **generation_kwargs)
-            return self.tokenizer.decode(output[0], skip_special_tokens=True)
+        if template_name is None:
+            if self.default_template_name is None:
+                logger.error("No template name provided and no default template set.")
+                return ""
+            template_name = self.default_template_name  
 
-        elif isinstance(prompts, list):
-            outputs = []
-            for prompt in prompts:  # Process prompts individually
-                input_ = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-                output = self.model.generate(**input_, **generation_kwargs)
-                outputs.append(self.tokenizer.decode(output[0], skip_special_tokens=True))  
-            return outputs
-        else:
-            raise TypeError("prompts must be a string or a list of strings.")
+        template_str = self.templates.get(template_name)
+        if template_str is None:
+            logger.error(f"Template '{template_name}' not found.")
+            return ""
 
-    def generate(
-        self, 
-        prompts: Union[str, List[str]], 
-        stream_output: bool = False, 
-        **generation_kwargs
-    ) -> Union[str, List[str], Generator]:
-        """
-        Generates text for given prompts, with optional streaming output.
-        """
-
-        generation_kwargs = {**self.kwargs, **generation_kwargs}  # Combine default and specific kwargs
-
-        # Set defaults based on encoder-decoder model 
-        generation_kwargs["max_new_tokens"] = generation_kwargs.get("max_new_tokens", 256 if self.is_encoder_decoder else 512)
-        generation_kwargs["num_beams"] = generation_kwargs.get("num_beams", 1 if self.is_encoder_decoder else None)
-
-        # Streaming support
-        if stream_output:
-            if isinstance(prompts, list):
-                return (self._generate_text(prompt, **generation_kwargs) for prompt in prompts) # Streaming
-            elif isinstance(prompts, str):
-                return self._generate_text(prompts, **generation_kwargs)
+        context = kwargs.get('context', [])
+        if context:
+            if all(isinstance(item, str) for item in context): 
+                kwargs['context'] = "\n".join(context)
+            elif all(isinstance(item, dict) for item in context) and all('document' in item for item in context):
+                # Handle ChromaDB results that include metadata (dictionaries)
+                kwargs['context'] = "\n".join([item['document'] for item in context]) 
             else:
-                raise TypeError("prompts must be a string or list of strings.")
-        else:
-            return self._generate_text(prompts, **generation_kwargs)
+                kwargs['context'] = "\n".join([item.text for item in context])
+        else:  # If context is not provided or is empty, modify the template to exclude it
+            template_str = template_str.replace("Context:\n{{ context }}\n\n", "")
+
+        try:  
+            template = Template(template_str)  
+            prompt = template.render(**kwargs)
+            return prompt
+        except Exception as e:
+            logger.error(f"Error rendering template: {e}")
+            return ""
+
+    def list_templates(self) -> List[str]:
+        """Returns a list of available template names."""
+        return list(self.templates.keys())
