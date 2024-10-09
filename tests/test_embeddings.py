@@ -37,6 +37,28 @@ class TestEmbeddings(unittest.TestCase):
 
         self.assertIsInstance(result, np.ndarray)
         self.assertEqual(result.shape, (2, 2))  # 2 texts, 2-dimensional embeddings
+    
+    def test_embed_nodes(self):
+        embeddings = Embeddings()
+        nodes = [Node("Hello world"), Node("Test embedding")]
+        
+        # Mock the embed method
+        with patch.object(Embeddings, 'embed', return_value=np.array([[0.1, 0.2], [0.3, 0.4]])):
+            result = embeddings.embed_nodes(nodes)
+
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result[0].embedding, np.ndarray)
+        self.assertEqual(result[0].embedding.shape, (2,))
+
+    def test_cosine_similarity(self):
+        embedding1 = np.array([1, 0])
+        embedding2 = np.array([0, 1])
+        similarity = Embeddings.cosine_similarity(embedding1, embedding2)
+        self.assertAlmostEqual(similarity[0][0], 0)
+
+        embedding3 = np.array([1, 1])
+        similarity = Embeddings.cosine_similarity(embedding1, embedding3)
+        self.assertAlmostEqual(similarity[0][0], 1 / np.sqrt(2))
 
 
 if __name__ == '__main__':
