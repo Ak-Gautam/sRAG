@@ -70,6 +70,23 @@ class TestVectorStore(unittest.TestCase):
         self.assertIn('score', results[0])
         self.assertIn('document', results[0])
 
+    def test_save_faiss(self):
+        vs = VectorStore(vector_store_type="faiss")
+        vs.index = MagicMock()
+        vs.save()
+        self.mock_faiss.write_index.assert_called_once()
+
+    @patch('os.path.exists', return_value=True)
+    def test_load_faiss(self, mock_exists):
+        vs = VectorStore(vector_store_type="faiss")
+        vs.load()
+        self.mock_faiss.read_index.assert_called_once()
+
+    @patch('os.path.exists', return_value=False)
+    def test_load_faiss_no_file(self, mock_exists):
+        vs = VectorStore(vector_store_type="faiss")
+        vs.load()
+        self.mock_faiss.read_index.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()
