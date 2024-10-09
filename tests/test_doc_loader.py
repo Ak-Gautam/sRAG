@@ -148,3 +148,6 @@ class TestDocumentLoader(unittest.TestCase):
 
         # Restore permissions for cleanup
         os.chmod(no_access_file, 0o666)
+
+if __name__ == "__main__":
+    unittest.main()
