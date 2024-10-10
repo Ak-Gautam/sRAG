@@ -37,6 +37,11 @@ class TestLLM(unittest.TestCase):
         self.mock_causal.assert_called_once_with(self.model_name, trust_remote_code=True)
         self.assertFalse(llm.is_encoder_decoder)
 
+    def test_initialization_cpu(self):
+        self.mock_cuda.return_value = False
+        llm = LLM(self.model_name, use_gpu=True)
+        self.assertEqual(llm.device, -1)
+
     @patch('srag.llm.LLM._generate_text')
     def test_generate_single_prompt(self, mock_generate):
         llm = LLM(self.model_name)
