@@ -1,5 +1,8 @@
 pymupdf
 spacy
-sentence-transformers
+nltk
+transformers
 faiss-cpu
- chromadb
+chromadb
+jinja2
+markdown
