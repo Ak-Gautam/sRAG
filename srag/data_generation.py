@@ -3,7 +3,7 @@ import json
 import csv
 import os
 from typing import List, Dict, Any, Optional, Union, Iterator
-from srag.document_loader import DocumentLoader
+from srag.doc_loader import DocumentLoader
 from srag.llm import LLM
 from srag.prompt_manager import PromptManager
 from srag.chunk_node import get_chunk_splitter, ChunkSplitter, Node
@@ -105,7 +105,7 @@ class DataGenerator:
                     continue
 
         # Generate dataset entries using LLM (streaming)
-        generated_entries = self.llm.generate(list(prompt_generator(num_entries, knowledge_nodes, prompt_template)), stream_output=True, **llm_kwargs)  
+        generated_entries = self.llm.generate(list(prompt_generator(num_entries, knowledge_nodes, prompt_template)), **llm_kwargs)  
 
         # Function to structure generated entries
         def structure_entry(entry: str):
@@ -118,7 +118,7 @@ class DataGenerator:
 
         # Structure generated entries 
         structured_entries = [
-            structured_entry(entry) for entry in generated_entries if structured_entry(entry)
+            structure_entry(entry) for entry in generated_entries if structure_entry(entry)
         ]
 
         self._save_dataset(structured_entries)  
