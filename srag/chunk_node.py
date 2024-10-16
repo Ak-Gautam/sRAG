@@ -5,7 +5,7 @@ import fitz
 import markdown
 import re
 import nltk
-from srag.document_loader import Document
+from srag.doc_loader import Document
 
 
 class Node:

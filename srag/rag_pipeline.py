@@ -1,6 +1,6 @@
 import logging
 from typing import List, Dict, Any, Optional, Union, Generator
-from srag.document_loader import DocumentLoader
+from srag.doc_loader import DocumentLoader
 from srag.chunk_node import get_chunk_splitter, ChunkSplitter, Node 
 from srag.embeddings import Embeddings
 from srag.vector_store import VectorStore

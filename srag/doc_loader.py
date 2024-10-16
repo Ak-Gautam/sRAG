@@ -103,7 +103,7 @@ class DocumentLoader:
             'file_path': str(file_path),
             'file_type': 'application/pdf',
             'file_size': file_stats.st_size,
-            'creation_date': datetime.datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d'),
+            'creation_date': datetime.datetime.fromtimestamp(file_stats.st_birthtime).strftime('%Y-%m-%d'),
             'last_modified_date': datetime.datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d')
         }
 
