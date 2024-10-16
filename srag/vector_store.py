@@ -4,7 +4,7 @@ import logging
 import chromadb
 import numpy as np
 from typing import List, Dict, Any
-from chunk_node import Node  # Updated import
+from srag.chunk_node import Node  # Updated import
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

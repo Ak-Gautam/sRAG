@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from typing import List
 from transformers import AutoTokenizer, AutoModel
-from chunk_node import Node
+from srag.chunk_node import Node
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
