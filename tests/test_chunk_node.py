@@ -9,7 +9,7 @@ from srag.chunk_node import (
     ParagraphChunkSplitter,
     get_chunk_splitter,
 )
-from srag.document_loader import Document
+from srag.doc_loader import Document
 
 
 class TestNode(unittest.TestCase):
