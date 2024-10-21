@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import shutil
 from unittest.mock import patch, MagicMock
-from srag.document_loader import DocumentLoader, Document
+from srag.doc_loader import DocumentLoader, Document
 
 class TestDocumentLoader(unittest.TestCase):
     """Comprehensive tests for the DocumentLoader class."""

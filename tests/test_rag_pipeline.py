@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 from srag.rag_pipeline import RAGPipeline
 from srag.chunk_node import Node
-from srag.doc_loader import Document
+from srag.doc_loader import DocumentLoader
 
 
 class TestRAGPipeline(unittest.TestCase):

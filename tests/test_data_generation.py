@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import Mock, patch, mock_open
 import json
 import csv
-from srag.data_generator import DataGenerator
+from srag.data_generation import DataGenerator
 from srag.chunk_node import Node
 
 
