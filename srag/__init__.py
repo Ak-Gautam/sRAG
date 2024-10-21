@@ -1,11 +1,11 @@
-from .document_loader import DocumentLoader, Document
+from .doc_loader import DocumentLoader, Document
 from .chunk_node import get_chunk_splitter, Node, ChunkSplitter, TokenChunkSplitter, SentenceChunkSplitterWithOverlap, ParagraphChunkSplitter
 from .embeddings import Embeddings
 from .vector_store import VectorStore
 from .llm import LLM
 from .prompt_manager import PromptManager
 from .rag_pipeline import RAGPipeline
-from .data_generator import DataGenerator
+from .data_generation import DataGenerator
 
 __all__ = [
     "DocumentLoader", "Document", 
