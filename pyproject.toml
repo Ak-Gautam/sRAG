@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "srag"
+version = "0.1.0"
+authors = [
+    {name = "Akshay Gautam", email = ""}
+]
+description = "A simple library for building Retrieval Augmented Generation (RAG) applications."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+
+dependencies = [
+    "pymupdf",
+    "spacy",
+    "nltk",
+    "transformers",
+    "faiss-cpu",
+    "chromadb",
+    "jinja2",
+    "markdown"
+]
+
+[project.urls]
+"Homepage" = ""  # TODO: Add repo URL
+"Bug Tracker" = ""
