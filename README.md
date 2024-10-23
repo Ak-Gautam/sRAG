@@ -1,5 +1,6 @@
-# sRAG
+# zRAG
 
+zero-RAG
 Work in progress, lol!
 That side poject that never gets complete.
 

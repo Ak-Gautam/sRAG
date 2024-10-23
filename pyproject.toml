@@ -3,17 +3,16 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "srag"
+name = "zrag"
 version = "0.1.0"
 authors = [
-    {name = "Akshay Gautam", email = ""}
+    {name = "Akshay Gautam", email = "akshaygautam010@gmail.com"}
 ]
 description = "A simple library for building Retrieval Augmented Generation (RAG) applications."
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache 2.0 License",
     "Operating System :: OS Independent",
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -33,5 +32,5 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = ""  # TODO: Add repo URL
-"Bug Tracker" = ""
+"Homepage" = "https://github.com/Ak-Gautam/sRAG "
+"Bug Tracker" = "https://github.com/Ak-Gautam/sRAG/issues"
