@@ -2,8 +2,8 @@ import unittest
 import numpy as np
 from unittest.mock import patch, MagicMock
 
-from srag.embeddings import Embeddings
-from srag.chunk_node import Node
+from zrag.embeddings import Embeddings
+from zrag.chunk_node import Node
 
 
 class TestEmbeddings(unittest.TestCase):

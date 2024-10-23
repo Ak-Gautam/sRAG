@@ -1,6 +1,6 @@
 import unittest
-from srag.prompt_manager import PromptManager
-from srag.chunk_node import Node
+from zrag.prompt_manager import PromptManager
+from zrag.chunk_node import Node
 
 class TestPromptManager(unittest.TestCase):
     """Comprehensive tests for the PromptManager class."""

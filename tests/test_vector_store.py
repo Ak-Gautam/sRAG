@@ -3,8 +3,8 @@ import numpy as np
 import os
 from unittest.mock import patch, MagicMock
 
-from srag.vector_store import VectorStore
-from srag.chunk_node import Node
+from zrag.vector_store import VectorStore
+from zrag.chunk_node import Node
 
 
 class TestVectorStore(unittest.TestCase):

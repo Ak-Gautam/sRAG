@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import torch
-from srag.llm import LLM
+from zrag.llm import LLM
 
 
 class TestLLM(unittest.TestCase):

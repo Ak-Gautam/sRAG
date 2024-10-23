@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 
-from srag.chunk_node import (
+from zrag.chunk_node import (
     Node,
     ChunkSplitter,
     TokenChunkSplitter,
@@ -9,7 +9,7 @@ from srag.chunk_node import (
     ParagraphChunkSplitter,
     get_chunk_splitter,
 )
-from srag.doc_loader import Document
+from zrag.doc_loader import Document
 
 
 class TestNode(unittest.TestCase):
