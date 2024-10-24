@@ -27,6 +27,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest pytest-cov
         # Install spacy model
+        pip install spacy
         python -m spacy download en_core_web_sm
         # Install nltk data
         python -c "import nltk; nltk.download('punkt')"
