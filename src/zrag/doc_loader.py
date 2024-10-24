@@ -8,7 +8,6 @@ import mimetypes
 from pathlib import Path
 from typing import List, Dict, Optional, Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,6 +23,44 @@ class Document:
 
     def __repr__(self):
         return f"Document(document_id='{self.document_id}', metadata={self.metadata}, text='{self.text[:20]}...')"
+
+def _process_file(
+    file_path: Path,
+    encoding: str,
+    ext: Optional[List[str]],
+    exc: Optional[List[str]],
+    filenames: Optional[List[str]],
+    preprocess_fn: Optional[Callable[[str], str]] = None,
+    code_mime_types = None
+
+) -> List[Document]:
+    """
+    Helper function to process a single file based on filtering criteria.
+    """
+    from zrag.doc_loader import DocumentLoader, Document
+    # Check if the file should be processed based on filename
+    if filenames is not None and file_path.name not in filenames:
+        return []
+    
+    if ext is not None:
+        if not any(file_path.match(pattern) for pattern in ext):
+            return []
+    
+    if exc is not None:
+        if any(file_path.match(pattern) for pattern in exc):
+            return []
+        
+    if code_mime_types is not None:
+        mime_type, _ = mimetypes.guess_type(str(file_path))
+        if mime_type not in code_mime_types:
+            return []
+    
+    try:
+        return DocumentLoader._read_file(file_path, encoding, preprocess_fn)
+    except Exception as e:
+        logger.error(f"Error reading file {file_path}: {e}")
+        return []
+
 
 
 class DocumentLoader:
@@ -197,36 +234,6 @@ class DocumentLoader:
         document_id = str(uuid.uuid4())
         return Document(document_id, metadata, text)
 
-    @staticmethod
-    def _process_file(
-        file_path: Path, 
-        encoding: str, 
-        ext: Optional[List[str]], 
-        exc: Optional[List[str]], 
-        filenames: Optional[List[str]], 
-        preprocess_fn: Optional[Callable[[str], str]] = None
-    ) -> List[Document]:
-        """
-        Helper function to process a single file based on filtering criteria.
-        """
-        # Check if the file should be processed based on filename
-        if filenames is not None and file_path.name not in filenames:
-            return []
-        
-        if ext is not None:
-            if not any(file_path.match(pattern) for pattern in ext):
-                return []
-        
-        if exc is not None:
-            if any(file_path.match(pattern) for pattern in exc):
-                return []
-        
-        try:
-            return DocumentLoader._read_file(file_path, encoding, preprocess_fn)
-        except Exception as e:
-            logger.error(f"Error reading file {file_path}: {e}")
-            return []
-
     def load(
         self,
         recursive: bool = False,
@@ -248,13 +255,14 @@ class DocumentLoader:
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(
-                    self._process_file,
+                    _process_file, # Changed here to refer to external function
                     file_path,
                     self.encoding,
                     ext,
                     exc,
                     filenames,
-                    preprocess_fn
+                    preprocess_fn,
+                    self.CODE_MIME_TYPES  # Pass CODE_MIME_TYPES to the function
                 ): file_path for file_path in file_paths
             }
 
