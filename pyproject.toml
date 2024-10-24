@@ -35,3 +35,20 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/Ak-Gautam/sRAG "
 "Bug Tracker" = "https://github.com/Ak-Gautam/sRAG/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["tests_*.py"]
+addopts = "--cov-report term-missing --cov=zrag"
+
+[tool.coverage.run]
+source = ["zrag"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "raise ImportError",
+]
