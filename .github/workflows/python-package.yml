@@ -30,6 +30,7 @@ jobs:
         pip install spacy
         python -m spacy download en_core_web_sm
         # Install nltk data
+        pip install nltk
         python -c "import nltk; nltk.download('punkt')"
         pip install -e .
         
