@@ -7,4 +7,4 @@ zero-RAG
 [![PyPI version](https://badge.fury.io/py/zrag.svg)](https://badge.fury.io/py/zrag)
 [![Python Versions](https://img.shields.io/pypi/pyversions/zrag.svg)](https://pypi.org/project/zrag/)
 
-A lightweight RAG implementation to quickly run it with oss models and vector stores.
+A lightweight RAG implementation to quickly run it with oss models and vector stores. Simple and easy to use.
