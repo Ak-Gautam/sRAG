@@ -8,6 +8,7 @@ import mimetypes
 from pathlib import Path
 from typing import List, Dict, Optional, Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ class Document:
     def __repr__(self):
         return f"Document(document_id='{self.document_id}', metadata={self.metadata}, text='{self.text[:20]}...')"
 
+
 def _process_file(
     file_path: Path,
     encoding: str,
@@ -31,36 +33,36 @@ def _process_file(
     exc: Optional[List[str]],
     filenames: Optional[List[str]],
     preprocess_fn: Optional[Callable[[str], str]] = None,
-    code_mime_types = None
-
+    code_mime_types=None  # Added to receive CODE_MIME_TYPES
 ) -> List[Document]:
     """
     Helper function to process a single file based on filtering criteria.
     """
-    from zrag.doc_loader import DocumentLoader, Document
+    from zrag.doc_loader import DocumentLoader, Document  # Import inside the function
+
     # Check if the file should be processed based on filename
     if filenames is not None and file_path.name not in filenames:
         return []
-    
+
     if ext is not None:
         if not any(file_path.match(pattern) for pattern in ext):
             return []
-    
+
     if exc is not None:
         if any(file_path.match(pattern) for pattern in exc):
             return []
-        
-    if code_mime_types is not None:
-        mime_type, _ = mimetypes.guess_type(str(file_path))
-        if mime_type not in code_mime_types:
-            return []
-    
+
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+
+    # Check for code MIME types using the passed dictionary
+    if code_mime_types is not None and mime_type in code_mime_types:
+        return DocumentLoader._read_code(file_path, encoding, preprocess_fn)
+
     try:
         return DocumentLoader._read_file(file_path, encoding, preprocess_fn)
     except Exception as e:
         logger.error(f"Error reading file {file_path}: {e}")
         return []
-
 
 
 class DocumentLoader:
@@ -94,8 +96,8 @@ class DocumentLoader:
 
     @staticmethod
     def _read_file(
-        file_path: Path, 
-        encoding: str, 
+        file_path: Path,
+        encoding: str,
         preprocess_fn: Optional[Callable[[str], str]] = None
     ) -> List[Document]:
         """Reads a file based on its MIME type."""
@@ -122,8 +124,8 @@ class DocumentLoader:
 
     @staticmethod
     def _read_pdf(
-        file_path: Path, 
-        encoding: str, 
+        file_path: Path,
+        encoding: str,
         preprocess_fn: Optional[Callable[[str], str]] = None
     ) -> List[Document]:
         """Reads a PDF file."""
@@ -140,7 +142,7 @@ class DocumentLoader:
             'file_path': str(file_path),
             'file_type': 'application/pdf',
             'file_size': file_stats.st_size,
-            'creation_date': datetime.datetime.fromtimestamp(file_stats.st_birthtime).strftime('%Y-%m-%d'),
+            'creation_date': datetime.datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d'),
             'last_modified_date': datetime.datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d')
         }
 
@@ -166,15 +168,15 @@ class DocumentLoader:
 
     @staticmethod
     def _read_markdown(
-        file_path: Path, 
-        encoding: str, 
+        file_path: Path,
+        encoding: str,
         preprocess_fn: Optional[Callable[[str], str]] = None
     ) -> List[Document]:
         """Reads a Markdown file."""
         try:
             with open(file_path, encoding=encoding) as f:
                 md_content = f.read()
-            # Convert Markdown to plain text 
+            # Convert Markdown to plain text
             text = markdown.markdown(md_content)
             if preprocess_fn:
                 text = preprocess_fn(text)
@@ -201,8 +203,8 @@ class DocumentLoader:
 
     @staticmethod
     def _read_code(
-        file_path: Path, 
-        encoding: str, 
+        file_path: Path,
+        encoding: str,
         preprocess_fn: Optional[Callable[[str], str]] = None
     ) -> List[Document]:
         """Reads a code file."""
@@ -234,6 +236,36 @@ class DocumentLoader:
         document_id = str(uuid.uuid4())
         return Document(document_id, metadata, text)
 
+    @staticmethod
+    def _process_file(
+        file_path: Path,
+        encoding: str,
+        ext: Optional[List[str]],
+        exc: Optional[List[str]],
+        filenames: Optional[List[str]],
+        preprocess_fn: Optional[Callable[[str], str]] = None
+    ) -> List[Document]:
+        """
+        Helper function to process a single file based on filtering criteria.
+        """
+        # Check if the file should be processed based on filename
+        if filenames is not None and file_path.name not in filenames:
+            return []
+
+        if ext is not None:
+            if not any(file_path.match(pattern) for pattern in ext):
+                return []
+
+        if exc is not None:
+            if any(file_path.match(pattern) for pattern in exc):
+                return []
+
+        try:
+            return DocumentLoader._read_file(file_path, encoding, preprocess_fn)
+        except Exception as e:
+            logger.error(f"Error reading file {file_path}: {e}")
+            return []
+
     def load(
         self,
         recursive: bool = False,
@@ -255,14 +287,14 @@ class DocumentLoader:
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(
-                    _process_file, # Changed here to refer to external function
+                    _process_file,  # Call the external function
                     file_path,
                     self.encoding,
                     ext,
                     exc,
                     filenames,
                     preprocess_fn,
-                    self.CODE_MIME_TYPES  # Pass CODE_MIME_TYPES to the function
+                    self.CODE_MIME_TYPES  # Pass CODE_MIME_TYPES
                 ): file_path for file_path in file_paths
             }
 
