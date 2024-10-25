@@ -31,7 +31,7 @@ class TestNode(unittest.TestCase):
 class TestTokenChunkSplitter(unittest.TestCase):
     """Tests for the TokenChunkSplitter class."""
 
-    @patch("srag.chunk_node.spacy.load")
+    @patch("zrag.chunk_node.spacy.load")
     def setUp(self, mock_spacy_load):
         """Sets up a mock spaCy NLP pipeline for testing."""
         self.mock_nlp = MagicMock()
@@ -65,8 +65,8 @@ class TestTokenChunkSplitter(unittest.TestCase):
 class TestSentenceChunkSplitterWithOverlap(unittest.TestCase):
     """Tests for the SentenceChunkSplitterWithOverlap class."""
 
-    @patch("srag.chunk_node.nltk.download")
-    @patch("srag.chunk_node.nltk.tokenize.PunktSentenceTokenizer")
+    @patch("zrag.chunk_node.nltk.download")
+    @patch("zrag.chunk_node.nltk.tokenize.PunktSentenceTokenizer")
     def setUp(self, mock_punkt, mock_download):
         """Sets up a mock sentence tokenizer for testing."""
         self.mock_tokenizer = mock_punkt.return_value

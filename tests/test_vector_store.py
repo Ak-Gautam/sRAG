@@ -10,8 +10,8 @@ from zrag.chunk_node import Node
 class TestVectorStore(unittest.TestCase):
     """Comprehensive tests for the VectorStore class."""
 
-    @patch("srag.vector_store.faiss")
-    @patch("srag.vector_store.chromadb")
+    @patch("zrag.vector_store.faiss")
+    @patch("zrag.vector_store.chromadb")
     def setUp(self, mock_chroma, mock_faiss):
         """Sets up mocks for FAISS and ChromaDB."""
         self.mock_faiss = mock_faiss

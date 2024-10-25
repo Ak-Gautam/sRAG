@@ -9,8 +9,8 @@ from zrag.chunk_node import Node
 class TestEmbeddings(unittest.TestCase):
     """Comprehensive tests for the Embeddings class."""
 
-    @patch("srag.embeddings.AutoModel.from_pretrained")
-    @patch("srag.embeddings.AutoTokenizer.from_pretrained")
+    @patch("zrag.embeddings.AutoModel.from_pretrained")
+    @patch("zrag.embeddings.AutoTokenizer.from_pretrained")
     def setUp(self, mock_tokenizer, mock_model):
         """Sets up mocks for the Hugging Face model and tokenizer."""
         self.mock_model = mock_model.return_value

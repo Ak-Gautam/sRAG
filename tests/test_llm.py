@@ -7,10 +7,10 @@ from zrag.llm import LLM
 class TestLLM(unittest.TestCase):
     """Comprehensive tests for the LLM class."""
 
-    @patch("srag.llm.AutoTokenizer.from_pretrained")
-    @patch("srag.llm.AutoModelForSeq2SeqLM.from_pretrained")
-    @patch("srag.llm.AutoModelForCausalLM.from_pretrained")
-    @patch("srag.llm.torch.cuda.is_available")
+    @patch("zrag.llm.AutoTokenizer.from_pretrained")
+    @patch("zrag.llm.AutoModelForSeq2SeqLM.from_pretrained")
+    @patch("zrag.llm.AutoModelForCausalLM.from_pretrained")
+    @patch("zrag.llm.torch.cuda.is_available")
     def setUp(self, mock_cuda, mock_causal, mock_seq2seq, mock_tokenizer):
         """Sets up mocks for tokenizer, models, and CUDA availability."""
         self.model_name = "test-model"
@@ -54,7 +54,7 @@ class TestLLM(unittest.TestCase):
         llm = LLM(self.model_name, use_gpu=False)  # Force CPU usage
         self.assertEqual(llm.device, -1)  # CPU device
 
-    @patch("srag.llm.LLM._generate_text")
+    @patch("zrag.llm.LLM._generate_text")
     def test_generate_single_prompt(self, mock_generate):
         """Tests generating text for a single prompt."""
         llm = LLM(self.model_name)
@@ -68,7 +68,7 @@ class TestLLM(unittest.TestCase):
             prompt, max_new_tokens=256, num_beams=1
         )  # Default args for seq2seq
 
-    @patch("srag.llm.LLM._generate_text")
+    @patch("zrag.llm.LLM._generate_text")
     def test_generate_multiple_prompts(self, mock_generate):
         """Tests generating text for multiple prompts."""
         llm = LLM(self.model_name)
@@ -82,7 +82,7 @@ class TestLLM(unittest.TestCase):
             prompts, max_new_tokens=256, num_beams=1
         )  # Default args for seq2seq
 
-    @patch("srag.llm.LLM._generate_text")
+    @patch("zrag.llm.LLM._generate_text")
     def test_generate_stream_single(self, mock_generate):
         """Tests generating text with streaming output for a single prompt."""
         llm = LLM(self.model_name)
@@ -96,7 +96,7 @@ class TestLLM(unittest.TestCase):
             prompt, max_new_tokens=256, num_beams=1
         )
 
-    @patch("srag.llm.LLM._generate_text")
+    @patch("zrag.llm.LLM._generate_text")
     def test_generate_stream_multiple(self, mock_generate):
         """Tests generating text with streaming output for multiple prompts."""
         llm = LLM(self.model_name)
@@ -114,7 +114,7 @@ class TestLLM(unittest.TestCase):
         with self.assertRaises(TypeError):
             llm.generate(123)  # Invalid input type
 
-    @patch("srag.llm.LLM._generate_text")
+    @patch("zrag.llm.LLM._generate_text")
     def test_generate_with_custom_kwargs_seq2seq(self, mock_generate):
         """Tests generating text with custom keyword arguments (seq2seq)."""
         llm = LLM(self.model_name, temperature=0.7)  # Custom kwargs in init
@@ -130,7 +130,7 @@ class TestLLM(unittest.TestCase):
             prompt, max_new_tokens=100, num_beams=1, temperature=0.7, top_k=50
         )
 
-    @patch("srag.llm.LLM._generate_text")
+    @patch("zrag.llm.LLM._generate_text")
     def test_generate_with_custom_kwargs_causal(self, mock_generate):
         """Tests generating text with custom keyword arguments (causal)."""
         self.mock_seq2seq.side_effect = ValueError(

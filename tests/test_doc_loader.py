@@ -92,7 +92,7 @@ class TestDocumentLoader(unittest.TestCase):
         self.assertIn('creation_date', metadata)
         self.assertIn('last_modified_date', metadata)
 
-    @patch('srag.document_loader.fitz.open')
+    @patch('zrag.document_loader.fitz.open')
     def test_load_pdf(self, mock_fitz_open):
         # Mock PDF document
         mock_pdf = MagicMock()
@@ -117,7 +117,7 @@ class TestDocumentLoader(unittest.TestCase):
         documents = self.loader.load(ext=['.txt'], preprocess_fn=preprocess)
         self.assertEqual(documents[0].text, 'THIS IS A TEST TEXT FILE.')
 
-    @patch('srag.document_loader.ProcessPoolExecutor')
+    @patch('zrag.document_loader.ProcessPoolExecutor')
     def test_concurrent_loading(self, mock_executor):
         mock_executor.return_value.__enter__.return_value.submit.side_effect = lambda f, *args, **kwargs: MagicMock(result=lambda: f(*args, **kwargs))
         
