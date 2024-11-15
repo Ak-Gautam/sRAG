@@ -17,7 +17,14 @@ class TestDocumentLoader(unittest.TestCase):
 
         # Create dummy files
         with open(cls.pdf_path, "wb") as f:
-            f.write(b"%PDF-1.5\n...")  # Minimal PDF content
+            f.write(b"%PDF-1.5\n%\xe2\xe3\xcf\xd3\n" # Valid PDF header
+                   b"1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n"
+                   b"2 0 obj\n<<\n/Type /Pages\n/Kids [3 0 R]\n/Count 1\n>>\nendobj\n"
+                   b"3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/MediaBox [0 0 612 792]\n"
+                   b"/Contents 4 0 R\n>>\nendobj\n"
+                   b"4 0 obj\n<<\n/Length 21\n>>\nstream\nBT\n/F1 12 Tf\n72 712 Td\n(Test PDF)Tj\nET\nendstream\nendobj\n"
+                   b"xref\n0 5\n0000000000 65535 f\n0000000018 00000 n\n0000000077 00000 n\n"
+                   b"0000000178 00000 n\n0000000457 00000 n\ntrailer\n<<\n/Root 1 0 R\n/Size 5\n>>\nstartxref\n565\n%%EOF\n")
         with open(cls.md_path, "w", encoding="utf-8") as f:
             f.write("# Test Markdown\nThis is a test.")
         with open(cls.txt_path, "w", encoding="utf-8") as f:

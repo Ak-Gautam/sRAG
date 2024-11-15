@@ -25,6 +25,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        pip install --upgrade --force-reinstall pymupdf
         pip install pytest pytest-cov
         # Install spacy model
         pip install spacy
