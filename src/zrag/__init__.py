@@ -6,6 +6,20 @@ from .llm import LLM
 from .prompt_manager import PromptManager
 from .rag_pipeline import RAGPipeline
 from .data_generation import DataGenerator
+from .exceptions import (
+    ZRAGError, 
+    DocumentLoadError, 
+    UnsupportedFileFormatError,
+    InvalidChunkSizeError,
+    EmbeddingError,
+    ModelLoadError,
+    VectorStoreError,
+    VectorStoreNotInitializedError,
+    LLMError,
+    PromptError,
+    TemplateNotFoundError,
+    RAGPipelineError
+)
 
 __all__ = [
     "DocumentLoader", "Document", 
@@ -15,7 +29,20 @@ __all__ = [
     "LLM",
     "PromptManager",
     "RAGPipeline",
-    "DataGenerator"
+    "DataGenerator",
+    # Exceptions
+    "ZRAGError", 
+    "DocumentLoadError", 
+    "UnsupportedFileFormatError",
+    "InvalidChunkSizeError",
+    "EmbeddingError",
+    "ModelLoadError",
+    "VectorStoreError",
+    "VectorStoreNotInitializedError",
+    "LLMError",
+    "PromptError",
+    "TemplateNotFoundError",
+    "RAGPipelineError"
 ]
 
 __version__ = "0.1.2"
