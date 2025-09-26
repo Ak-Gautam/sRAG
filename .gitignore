@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.py[cod]
+
 *$py.class
 *.so
 .Python
@@ -28,6 +29,7 @@ htmlcov/
 # Virtual Environment
 .env
 .venv
+.penv/
 env/
 venv/
 ENV/
