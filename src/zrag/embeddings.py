@@ -9,9 +9,8 @@ import numpy as np
 import torch
 from transformers import AutoModel, AutoTokenizer
 
-from .chunk_node import Node
 from .exceptions import EmbeddingError, ModelLoadError
-from .models import EmbeddingConfig, EmbeddingVector
+from .models import EmbeddingConfig, EmbeddingVector, Node
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -75,6 +74,24 @@ class Embeddings:
 
         if auto_load:
             self._lazy_load_model()
+
+    @property
+    def model_name(self) -> str:
+        """Expose the configured model name (backwards compatibility)."""
+
+        return self.config.model_name
+
+    @property
+    def batch_size(self) -> int:
+        """Expose the configured batch size."""
+
+        return self.config.batch_size
+
+    @property
+    def normalize(self) -> bool:
+        """Expose whether embeddings are normalised by default."""
+
+        return self.config.normalize
 
     def _lazy_load_model(self) -> None:
         """Load model and tokenizer only when needed."""

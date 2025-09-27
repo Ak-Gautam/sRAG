@@ -4,8 +4,16 @@ from .embeddings import Embeddings
 from .vector_store import VectorStore
 from .llm import LLM
 from .prompt_manager import PromptManager
-from .rag_pipeline import RAGPipeline
+from .rag_pipeline import IngestionReport, PipelineTrace, RAGPipeline
 from .data_generation import DataGenerator
+from .models import (
+    ChunkerConfig,
+    EmbeddingConfig,
+    RAGConfig,
+    RetrievalResult,
+    StageTiming,
+    VectorStoreConfig,
+)
 from .exceptions import (
     ZRAGError, 
     DocumentLoadError, 
@@ -29,7 +37,15 @@ __all__ = [
     "LLM",
     "PromptManager",
     "RAGPipeline",
+    "PipelineTrace",
+    "IngestionReport",
     "DataGenerator",
+    "RAGConfig",
+    "ChunkerConfig",
+    "EmbeddingConfig",
+    "VectorStoreConfig",
+    "RetrievalResult",
+    "StageTiming",
     # Exceptions
     "ZRAGError", 
     "DocumentLoadError", 

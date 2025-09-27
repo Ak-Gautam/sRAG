@@ -1,3 +1,5 @@
+import os
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -22,16 +24,18 @@ class TestVectorStore(unittest.TestCase):
         self.mock_chroma.PersistentClient.return_value = MagicMock()
         self.mock_collection = MagicMock()
         self.mock_chroma.PersistentClient.return_value.get_or_create_collection.return_value = self.mock_collection
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
 
     def test_initialization_faiss(self):
         """Tests initialization with FAISS."""
-        vs = VectorStore(vector_store_type="faiss")
+        vs = VectorStore(vector_store_type="faiss", index_path=os.path.join(self.tempdir.name, "faiss_index.bin"))
         self.assertEqual(vs.vector_store_type, "faiss")
         self.assertIsNone(vs.index)
 
     def test_initialization_chroma(self):
         """Tests initialization with ChromaDB."""
-        vs = VectorStore(vector_store_type="chroma")
+        vs = VectorStore(vector_store_type="chroma", chroma_persist_dir=self.tempdir.name)
         self.assertEqual(vs.vector_store_type, "chroma")
         self.assertIsNotNone(vs.client)
         self.assertIs(self.mock_collection, vs.collection)
@@ -43,7 +47,7 @@ class TestVectorStore(unittest.TestCase):
 
     def test_index_faiss(self):
         """Tests indexing with FAISS."""
-        vs = VectorStore(vector_store_type="faiss")
+        vs = VectorStore(vector_store_type="faiss", index_path=os.path.join(self.tempdir.name, "faiss_index.bin"))
         chunks = [
             Node("text1", embedding=np.array([0.1, 0.2])),
             Node("text2", embedding=np.array([0.3, 0.4])),
@@ -55,7 +59,7 @@ class TestVectorStore(unittest.TestCase):
 
     def test_index_chroma(self):
         """Tests indexing with ChromaDB."""
-        vs = VectorStore(vector_store_type="chroma")
+        vs = VectorStore(vector_store_type="chroma", chroma_persist_dir=self.tempdir.name)
         chunks = [
             Node("text1", metadata={"node_id": "1"}, embedding=np.array([0.1, 0.2])),
             Node("text2", metadata={"node_id": "2"}, embedding=np.array([0.3, 0.4])),
@@ -70,7 +74,7 @@ class TestVectorStore(unittest.TestCase):
 
     def test_search_faiss(self):
         """Tests searching with FAISS."""
-        vs = VectorStore(vector_store_type="faiss")
+        vs = VectorStore(vector_store_type="faiss", index_path=os.path.join(self.tempdir.name, "faiss_index.bin"))
         vs.index = MagicMock()
         vs._records = [
             {"node_id": "n1", "metadata": {"k": "v1"}, "text": "doc1"},
@@ -89,7 +93,7 @@ class TestVectorStore(unittest.TestCase):
 
     def test_search_chroma(self):
         """Tests searching with ChromaDB."""
-        vs = VectorStore(vector_store_type="chroma")
+        vs = VectorStore(vector_store_type="chroma", chroma_persist_dir=self.tempdir.name)
         vs.collection.query.return_value = {
             "ids": [["1", "2"]],
             "metadatas": [[{"key": "value1"}, {"key": "value2"}]],
@@ -109,7 +113,7 @@ class TestVectorStore(unittest.TestCase):
 
     def test_save_faiss(self):
         """Tests saving the FAISS index."""
-        vs = VectorStore(vector_store_type="faiss")
+        vs = VectorStore(vector_store_type="faiss", index_path=os.path.join(self.tempdir.name, "faiss_index.bin"))
         vs.index = MagicMock()
         vs._records = []
         vs.save()
@@ -118,7 +122,7 @@ class TestVectorStore(unittest.TestCase):
     @patch("pathlib.Path.exists", return_value=True)
     def test_load_faiss(self, mock_exists):
         """Tests loading the FAISS index when the file exists."""
-        vs = VectorStore(vector_store_type="faiss")
+        vs = VectorStore(vector_store_type="faiss", index_path=os.path.join(self.tempdir.name, "faiss_index.bin"))
         with patch.object(vs, "_load_metadata", return_value=[{"node_id": "n1", "metadata": {}, "text": ""}]):
             vs.load()
         self.mock_faiss.read_index.assert_called_once_with(str(vs.index_path))
@@ -126,7 +130,7 @@ class TestVectorStore(unittest.TestCase):
     @patch("pathlib.Path.exists", return_value=False)
     def test_load_faiss_no_file(self, mock_exists):
         """Tests loading the FAISS index when the file doesn't exist."""
-        vs = VectorStore(vector_store_type="faiss")
+        vs = VectorStore(vector_store_type="faiss", index_path=os.path.join(self.tempdir.name, "faiss_index.bin"))
         loaded = vs.load()
         self.assertFalse(loaded)
         self.mock_faiss.read_index.assert_not_called()
