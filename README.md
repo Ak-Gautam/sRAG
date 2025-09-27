@@ -13,6 +13,15 @@ A lightweight and easy-to-use RAG (Retrieval Augmented Generation) library for b
 pip install zrag
 ```
 
+### Development setup
+
+To work on the library and run the test suite locally:
+
+```bash
+pip install -e .[dev]
+pytest
+```
+
 ## Quick Start
 
 ```python

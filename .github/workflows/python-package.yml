@@ -26,14 +26,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install --upgrade --force-reinstall pymupdf
-        pip install pytest pytest-cov
-        # Install spacy model
-        pip install spacy
-        python -m spacy download en_core_web_sm
-        # Install nltk data
-        pip install nltk
-        python -c "import nltk; nltk.download('punkt')"
-        pip install -e .
+        pip install -e .[dev]
         
     - name: Run tests
       run: |
