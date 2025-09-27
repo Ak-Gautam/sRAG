@@ -1,11 +1,14 @@
-from typing import List, Dict, Optional
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-import re
-import logging
 import importlib
+import inspect
+import logging
+import re
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 from .exceptions import InvalidChunkSizeError, ZRAGError
-from .models import Document, Node
+from .models import Document, Node, ChunkerConfig
 
 # Optional heavy dependencies are loaded lazily and provide informative
 # error messages if missing. This prevents hard import failures for users
@@ -92,6 +95,29 @@ class ChunkSplitter(ABC):
         return nodes
 
 
+def _create_node(
+    document: Document,
+    text: str,
+    start: int,
+    chunk_type: str,
+    extra_metadata: Optional[Dict[str, str]] = None,
+) -> Node:
+    """Create a Node with consistent metadata enrichment."""
+
+    metadata: Dict[str, str] = {
+        "document_id": document.document_id,
+        "page_label": document.metadata.get("page_label", "1"),
+        "start_index": start,
+        "end_index": start + len(text),
+        "chunk_type": chunk_type,
+        "chunk_strategy": chunk_type,
+    }
+    if extra_metadata:
+        metadata.update(extra_metadata)
+
+    return Node(text.strip(), metadata)
+
+
 class TokenChunkSplitter(ChunkSplitter):
     """
     Splits documents into chunks of text based on tokens (words).
@@ -152,49 +178,42 @@ class TokenChunkSplitter(ChunkSplitter):
             return []
             
         try:
-            text = document.text
-            doc = self.nlp(text)
-            tokens = [token.text for token in doc]
+            doc = self.nlp(document.text)
 
-            if not tokens:
+            if not doc:
                 return []
 
-            nodes = []
-            current_chunk = []
-            current_chunk_start_index = 0
+            nodes: List[Node] = []
+            current_tokens: List[spacy.tokens.token.Token] = []  # type: ignore[attr-defined]
+            current_start: Optional[int] = None
 
-            for i, token in enumerate(tokens):
-                # If adding the token would exceed the chunk size, start a new chunk
-                if len(current_chunk) >= self.chunk_size:
-                    chunk_text = ' '.join(current_chunk)
-                    chunk_metadata = {
-                        'document_id': document.document_id,
-                        'page_label': document.metadata.get('page_label', '1'),
-                        'start_index': current_chunk_start_index,
-                        'end_index': current_chunk_start_index + len(chunk_text),
-                        'chunk_type': 'token',
-                        'chunk_size': len(current_chunk)
-                    }
-                    nodes.append(Node(chunk_text, chunk_metadata))
-                    current_chunk = [token]  # Start a new chunk 
-                    current_chunk_start_index = doc[i].idx if i < len(doc) else current_chunk_start_index + len(chunk_text)
-                else:
-                    current_chunk.append(token)
-
-            # Append the last chunk if it's not empty
-            if current_chunk:
-                chunk_text = ' '.join(current_chunk)
-                chunk_metadata = {
-                    'document_id': document.document_id,
-                    'page_label': document.metadata.get('page_label', '1'),
-                    'start_index': current_chunk_start_index,
-                    'end_index': current_chunk_start_index + len(chunk_text),
-                    'chunk_type': 'token',
-                    'chunk_size': len(current_chunk)
+            def flush() -> None:
+                nonlocal current_tokens, current_start
+                if not current_tokens:
+                    return
+                chunk_text = " ".join(token.text for token in current_tokens)
+                start_index = current_start if current_start is not None else 0
+                metadata = {
+                    "chunk_size": len(current_tokens),
                 }
-                nodes.append(Node(chunk_text, chunk_metadata))
+                nodes.append(
+                    _create_node(document, chunk_text, start_index, "token", metadata)
+                )
+                current_tokens = []
+                current_start = None
 
-            logger.debug(f"Split document {document.document_id} into {len(nodes)} token chunks")
+            for token in doc:  # type: ignore[attr-defined]
+                if current_start is None:
+                    current_start = token.idx
+                current_tokens.append(token)
+                if len(current_tokens) >= self.chunk_size:
+                    flush()
+
+            flush()
+
+            logger.debug(
+                "Split document %s into %d token chunks", document.document_id, len(nodes)
+            )
             return nodes
             
         except Exception as e:
@@ -272,57 +291,59 @@ class SentenceChunkSplitterWithOverlap(ChunkSplitter):
             
         try:
             text = document.text
-            sentences = self.tokenizer.tokenize(text)
+            sentence_spans = list(self.tokenizer.span_tokenize(text))
 
-            if not sentences:
+            if not sentence_spans:
                 return []
 
-            nodes = []
-            current_chunk = ""
-            current_chunk_start_index = 0
+            nodes: List[Node] = []
+            current_sentences: List[Tuple[str, int, int]] = []
 
-            for sentence in sentences:
-                sentence_len = len(sentence)
+            def current_text_length() -> int:
+                return len(" ".join(sentence for sentence, _, _ in current_sentences))
 
-                # If adding the sentence would exceed the chunk size, start a new chunk
-                if len(current_chunk) + sentence_len > self.chunk_size:
-                    if current_chunk.strip():  # Only create node if chunk has content
-                        chunk_metadata = {
-                            'document_id': document.document_id,
-                            'page_label': document.metadata.get('page_label', '1'),
-                            'start_index': current_chunk_start_index,
-                            'end_index': current_chunk_start_index + len(current_chunk),
-                            'chunk_type': 'sentence_overlap',
-                            'chunk_size': len(current_chunk),
-                            'overlap_size': self.overlap
-                        }
-                        nodes.append(Node(current_chunk.strip(), chunk_metadata))
-                    
-                    # Overlap logic
-                    overlap_start = max(0, len(current_chunk) - self.overlap)
-                    current_chunk = current_chunk[overlap_start:] + " " + sentence
-                    current_chunk_start_index += overlap_start
-
-                else:
-                    if current_chunk:
-                        current_chunk += " " + sentence
-                    else:
-                        current_chunk = sentence
-
-            # Append the last chunk if it's not empty
-            if current_chunk.strip():
-                chunk_metadata = {
-                    'document_id': document.document_id,
-                    'page_label': document.metadata.get('page_label', '1'),
-                    'start_index': current_chunk_start_index,
-                    'end_index': current_chunk_start_index + len(current_chunk),
-                    'chunk_type': 'sentence_overlap',
-                    'chunk_size': len(current_chunk),
-                    'overlap_size': self.overlap
+            def flush() -> None:
+                if not current_sentences:
+                    return
+                chunk_text = " ".join(sentence for sentence, _, _ in current_sentences)
+                chunk_start = current_sentences[0][1]
+                metadata = {
+                    "chunk_size": len(chunk_text),
+                    "overlap_size": self.overlap,
                 }
-                nodes.append(Node(current_chunk.strip(), chunk_metadata))
+                nodes.append(
+                    _create_node(document, chunk_text, chunk_start, "sentence_overlap", metadata)
+                )
 
-            logger.debug(f"Split document {document.document_id} into {len(nodes)} sentence chunks with overlap")
+            for span_start, span_end in sentence_spans:
+                sentence_text = text[span_start:span_end].strip()
+                if not sentence_text:
+                    continue
+
+                proposed_length = current_text_length() + (1 if current_sentences else 0) + len(sentence_text)
+                if current_sentences and proposed_length > self.chunk_size:
+                    flush()
+                    if self.overlap > 0 and current_sentences:
+                        overlap_chars = self.overlap
+                        retained: List[Tuple[str, int, int]] = []
+                        for sent in reversed(current_sentences):
+                            retained.insert(0, sent)
+                            overlap_chars -= len(sent[0])
+                            if overlap_chars <= 0:
+                                break
+                        current_sentences = retained
+                    else:
+                        current_sentences = []
+
+                current_sentences.append((sentence_text, span_start, span_end))
+
+            flush()
+
+            logger.debug(
+                "Split document %s into %d sentence chunks with overlap",
+                document.document_id,
+                len(nodes),
+            )
             return nodes
             
         except Exception as e:
@@ -375,57 +396,73 @@ class ParagraphChunkSplitter(ChunkSplitter):
             
         try:
             text = document.text
-            paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]  # Split by double newline and filter empty
+            pattern = re.compile(r"(.+?)(?:\n\s*\n|\Z)", re.DOTALL)
+            matches = [m for m in pattern.finditer(text) if m.group(1).strip()]
 
-            if not paragraphs:
+            if not matches:
                 return []
 
-            nodes = []
-            current_chunk = ""
-            current_chunk_start_index = 0
+            nodes: List[Node] = []
+            current_chunk_parts: List[Tuple[str, int, int]] = []
 
-            for paragraph in paragraphs:
-                paragraph_len = len(paragraph)
+            def chunk_length() -> int:
+                return sum(len(part[0]) for part in current_chunk_parts) + max(0, len(current_chunk_parts) - 1) * 2
 
-                # If adding the paragraph would exceed the chunk size, start a new chunk
-                if current_chunk and len(current_chunk) + paragraph_len + 2 > self.chunk_size:  # +2 for \n\n
-                    chunk_metadata = {
-                        'document_id': document.document_id,
-                        'page_label': document.metadata.get('page_label', '1'),
-                        'start_index': current_chunk_start_index,
-                        'end_index': current_chunk_start_index + len(current_chunk),
-                        'chunk_type': 'paragraph',
-                        'chunk_size': len(current_chunk)
-                    }
-                    nodes.append(Node(current_chunk.strip(), chunk_metadata))
-                    current_chunk = paragraph  # Start a new chunk 
-                    current_chunk_start_index += len(current_chunk) + 2  # Add 2 for the double newline
-                else:
-                    if current_chunk:
-                        current_chunk += "\n\n" + paragraph
-                    else:
-                        current_chunk = paragraph
-
-            # Append the last chunk if it's not empty
-            if current_chunk.strip():
-                chunk_metadata = {
-                    'document_id': document.document_id,
-                    'page_label': document.metadata.get('page_label', '1'),
-                    'start_index': current_chunk_start_index,
-                    'end_index': current_chunk_start_index + len(current_chunk),
-                    'chunk_type': 'paragraph',
-                    'chunk_size': len(current_chunk)
+            def flush() -> None:
+                if not current_chunk_parts:
+                    return
+                chunk_text = "\n\n".join(part[0] for part in current_chunk_parts)
+                chunk_start = current_chunk_parts[0][1]
+                metadata = {
+                    "chunk_size": len(chunk_text),
                 }
-                nodes.append(Node(current_chunk.strip(), chunk_metadata))
+                nodes.append(
+                    _create_node(document, chunk_text, chunk_start, "paragraph", metadata)
+                )
+                current_chunk_parts.clear()
 
-            logger.debug(f"Split document {document.document_id} into {len(nodes)} paragraph chunks")
+            for match in matches:
+                paragraph_text = match.group(1).strip()
+                start, end = match.span(1)
+
+                if current_chunk_parts and chunk_length() + len(paragraph_text) + 2 > self.chunk_size:
+                    flush()
+
+                current_chunk_parts.append((paragraph_text, start, end))
+
+            flush()
+
+            logger.debug(
+                "Split document %s into %d paragraph chunks",
+                document.document_id,
+                len(nodes),
+            )
             return nodes
             
         except Exception as e:
             raise ZRAGError(f"Failed to split document {document.document_id} into paragraph chunks", details=str(e))
 
 
-def get_chunk_splitter(strategy: str, **kwargs) -> ChunkSplitter:
+_CHUNK_SPLITTERS: Dict[str, Type[ChunkSplitter]] = {
+    "token": TokenChunkSplitter,
+    "sentence_overlap": SentenceChunkSplitterWithOverlap,
+    "overlap": SentenceChunkSplitterWithOverlap,
+    "paragraph": ParagraphChunkSplitter,
+}
+
+
+def register_chunk_splitter(name: str, splitter_cls: Type[ChunkSplitter]) -> None:
+    """Register a custom chunk splitter implementation."""
+
+    if not issubclass(splitter_cls, ChunkSplitter):
+        raise TypeError("splitter_cls must inherit from ChunkSplitter")
+    _CHUNK_SPLITTERS[name] = splitter_cls
+
+
+def get_chunk_splitter(
+    strategy: Union[str, ChunkerConfig],
+    **kwargs: Dict[str, Any],
+) -> ChunkSplitter:
     """
     Factory function to select the desired chunking strategy.
     
@@ -443,18 +480,26 @@ def get_chunk_splitter(strategy: str, **kwargs) -> ChunkSplitter:
         splitter = get_chunk_splitter('token', chunk_size=512)
         splitter = get_chunk_splitter('overlap', chunk_size=1024, overlap=128)
     """
-    strategies = {
-        'token': TokenChunkSplitter,
-        'overlap': SentenceChunkSplitterWithOverlap,
-        'paragraph': ParagraphChunkSplitter,
-    }
-    
-    if strategy not in strategies:
-        available = ', '.join(strategies.keys())
-        raise ValueError(f"Unknown chunking strategy: {strategy}. Available strategies: {available}")
-    
+    if isinstance(strategy, ChunkerConfig):
+        splitter_kwargs = {**strategy.as_kwargs(), **kwargs}
+        strategy_name = strategy.strategy
+    else:
+        splitter_kwargs = kwargs
+        strategy_name = strategy
+
+    splitter_class = _CHUNK_SPLITTERS.get(strategy_name)
+    if splitter_class is None:
+        available = ", ".join(sorted(_CHUNK_SPLITTERS))
+        raise ValueError(
+            f"Unknown chunking strategy: {strategy_name}. Available strategies: {available}"
+        )
+
     try:
-        splitter_class = strategies[strategy]
-        return splitter_class(**kwargs)
-    except Exception as e:
-        raise ZRAGError(f"Failed to create {strategy} chunk splitter", details=str(e))
+        signature = inspect.signature(splitter_class.__init__)
+        valid_params = {
+            name for name, param in signature.parameters.items() if name not in {"self"}
+        }
+        filtered_kwargs = {k: v for k, v in splitter_kwargs.items() if k in valid_params}
+        return splitter_class(**filtered_kwargs)
+    except Exception as exc:
+        raise ZRAGError(f"Failed to create {strategy_name} chunk splitter", details=str(exc))

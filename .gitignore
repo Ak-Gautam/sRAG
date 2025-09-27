@@ -47,3 +47,4 @@ ENV/
 *.pt
 *.pth
 .cache/
+arch_plan.md

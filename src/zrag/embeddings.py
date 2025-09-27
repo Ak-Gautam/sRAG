@@ -1,13 +1,17 @@
+from __future__ import annotations
+
 import gc
-import torch
 import logging
-import numpy as np
 from contextlib import contextmanager
-from typing import List, Optional, Iterator, Union
-from transformers import AutoTokenizer, AutoModel
+from typing import Iterable, Iterator, List, Optional
+
+import numpy as np
+import torch
+from transformers import AutoModel, AutoTokenizer
 
 from .chunk_node import Node
 from .exceptions import EmbeddingError, ModelLoadError
+from .models import EmbeddingConfig, EmbeddingVector
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -26,10 +30,15 @@ class Embeddings:
     """
 
     def __init__(
-        self, 
-        model_name: str = "nomic-ai/nomic-embed-text-v1.5", 
-        device: Optional[str] = None
-    ):
+        self,
+        config: Optional[EmbeddingConfig] = None,
+        *,
+        model_name: Optional[str] = None,
+        device: Optional[str] = None,
+        batch_size: Optional[int] = None,
+        normalize: Optional[bool] = None,
+        auto_load: bool = False,
+    ) -> None:
         """
         Initialize the Embeddings class.
         
@@ -40,50 +49,60 @@ class Embeddings:
         Raises:
             ModelLoadError: If model initialization fails
         """
-        if not model_name or not isinstance(model_name, str):
+        base_config = config or EmbeddingConfig()
+        self.config = EmbeddingConfig(
+            model_name=model_name or base_config.model_name,
+            device=device if device is not None else base_config.device,
+            batch_size=batch_size or base_config.batch_size,
+            normalize=normalize if normalize is not None else base_config.normalize,
+        )
+
+        if not self.config.model_name:
             raise ModelLoadError("Model name must be a non-empty string")
-            
-        self.model_name = model_name
-        self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
-        
+
+        self.device = self._resolve_device(self.config.device)
         self.tokenizer: Optional[AutoTokenizer] = None
         self.model: Optional[AutoModel] = None
         self._model_loaded = False
-        
-        logger.info(f"Embeddings initialized with model: {self.model_name} on device: {self.device}")
-        
-        # Lazy load model components
-        try:
+
+        logger.info(
+            "Embeddings initialized | model=%s device=%s batch_size=%d normalize=%s",
+            self.config.model_name,
+            self.device,
+            self.config.batch_size,
+            self.config.normalize,
+        )
+
+        if auto_load:
             self._lazy_load_model()
-        except Exception as e:
-            raise ModelLoadError(f"Failed to initialize model {model_name}", details=str(e))
 
     def _lazy_load_model(self) -> None:
         """Load model and tokenizer only when needed."""
         if not self._model_loaded:
             try:
-                logger.info(f"Loading embedding model: {self.model_name}")
-                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+                logger.info("Loading embedding model: %s", self.config.model_name)
+                self.tokenizer = AutoTokenizer.from_pretrained(self.config.model_name)
                 self.model = AutoModel.from_pretrained(
-                    self.model_name, 
-                    trust_remote_code=True
+                    self.config.model_name,
+                    trust_remote_code=True,
                 ).to(self.device)
                 self.model.eval()
                 self._model_loaded = True
                 logger.info("Model loaded successfully")
             except Exception as e:
-                raise ModelLoadError(f"Failed to load model {self.model_name}", details=str(e))
+                raise ModelLoadError(f"Failed to load model {self.config.model_name}", details=str(e))
 
-    def _get_device(self, device: str) -> str:
-        """Get appropriate device with validation."""
-        if device == "auto":
+    def _resolve_device(self, device: Optional[str]) -> str:
+        """Resolve the device string, respecting availability and configuration."""
+
+        if device is None or device == "auto":
             return "cuda" if torch.cuda.is_available() else "cpu"
-        elif device == "cuda" and not torch.cuda.is_available():
+        if device == "cuda" and not torch.cuda.is_available():
             logger.warning("CUDA requested but not available, falling back to CPU")
             return "cpu"
         return device
 
-    def embed(self, texts: List[str], batch_size: int = 4) -> np.ndarray:
+    def embed(self, texts: Iterable[str], batch_size: Optional[int] = None, *, normalize: Optional[bool] = None) -> np.ndarray:
         """
         Generates embeddings for a list of texts.
 
@@ -98,29 +117,36 @@ class Embeddings:
             EmbeddingError: If embedding generation fails
             ValueError: If inputs are invalid
         """
+        texts = list(texts)
         if not texts:
             raise ValueError("Text list cannot be empty")
             
-        if batch_size <= 0:
-            raise ValueError(f"Batch size must be positive, got {batch_size}")
-            
         if not all(isinstance(text, str) for text in texts):
             raise ValueError("All items in texts must be strings")
+
+        batch = batch_size or self.config.batch_size
+        if batch <= 0:
+            raise ValueError(f"Batch size must be positive, got {batch}")
 
         self._lazy_load_model()
         
         try:
             all_embeddings = []
             
-            logger.info(f"Generating embeddings for {len(texts)} texts in batches of {batch_size}")
+            logger.info(
+                "Generating embeddings | texts=%d batch_size=%d normalize=%s",
+                len(texts),
+                batch,
+                self.config.normalize if normalize is None else normalize,
+            )
             
             with torch.no_grad():
-                for i in range(0, len(texts), batch_size):
-                    batch = texts[i:i + batch_size]
+                for i in range(0, len(texts), batch):
+                    batch_texts = texts[i : i + batch]
                     
                     try:
                         encoded_input = self.tokenizer(
-                            batch, 
+                            batch_texts,
                             padding=True, 
                             truncation=True, 
                             return_tensors="pt"
@@ -135,17 +161,19 @@ class Embeddings:
                         all_embeddings.append(batch_embeddings)
                         
                         # Clear GPU cache periodically
-                        if torch.cuda.is_available() and i % (batch_size * 4) == 0:
+                        if torch.cuda.is_available() and i % (batch * 4) == 0:
                             torch.cuda.empty_cache()
                             
                     except Exception as e:
                         raise EmbeddingError(
-                            f"Failed to process batch {i//batch_size + 1}", 
+                            f"Failed to process batch {i // batch + 1}",
                             details=str(e)
                         )
                         
             result = np.concatenate(all_embeddings, axis=0)
-            logger.info(f"Successfully generated embeddings with shape {result.shape}")
+            if normalize if normalize is not None else self.config.normalize:
+                result = self._normalize_embeddings(result)
+            logger.info("Successfully generated embeddings with shape %s", result.shape)
             return result
             
         except Exception as e:
@@ -153,7 +181,7 @@ class Embeddings:
                 raise EmbeddingError("Failed to generate embeddings", details=str(e))
             raise
 
-    def embed_nodes(self, nodes: List[Node], batch_size: int = 4) -> List[Node]:
+    def embed_nodes(self, nodes: List[Node], batch_size: Optional[int] = None, *, normalize: Optional[bool] = None) -> List[Node]:
         """
         Generates embeddings for a list of nodes and updates the nodes in-place.
 
@@ -177,7 +205,7 @@ class Embeddings:
             
         try:
             texts = [node.text for node in nodes]
-            embeddings = self.embed(texts, batch_size=batch_size)
+            embeddings = self.embed(texts, batch_size=batch_size, normalize=normalize)
             
             for node, embedding in zip(nodes, embeddings):
                 node.embedding = embedding
@@ -189,7 +217,7 @@ class Embeddings:
             raise EmbeddingError("Failed to embed nodes", details=str(e))
 
     @contextmanager
-    def temporary_model_load(self) -> Iterator['Embeddings']:
+    def temporary_model_load(self) -> Iterator["Embeddings"]:
         """
         Context manager for temporary model usage with automatic cleanup.
         
@@ -204,16 +232,21 @@ class Embeddings:
             self._lazy_load_model()
             yield self
         finally:
-            if self._model_loaded:
-                del self.model
-                del self.tokenizer
-                self.model = None
-                self.tokenizer = None
-                self._model_loaded = False
-                gc.collect()
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                logger.info("Model unloaded and memory cleared")
+            self.close()
+
+    def close(self) -> None:
+        """Unload model weights and free associated resources."""
+
+        if self._model_loaded:
+            del self.model
+            del self.tokenizer
+            self.model = None
+            self.tokenizer = None
+            self._model_loaded = False
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            logger.info("Embedding model resources released")
 
     @staticmethod
     def mean_pooling(model_output, attention_mask):
@@ -261,3 +294,11 @@ class Embeddings:
         embedding2_norm = np.where(embedding2_norm == 0, 1e-9, embedding2_norm)
 
         return np.dot(embedding1, embedding2.T) / (embedding1_norm * embedding2_norm.T)
+
+    @staticmethod
+    def _normalize_embeddings(embeddings: np.ndarray) -> np.ndarray:
+        """L2-normalise embedding vectors."""
+
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        norms[norms == 0] = 1e-9
+        return embeddings / norms

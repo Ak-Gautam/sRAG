@@ -10,7 +10,12 @@ architecture.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+
+DEFAULT_CHUNK_SIZE = 1024
+DEFAULT_CHUNK_OVERLAP = 128
+DEFAULT_MAX_RETRIEVAL_DOCS = 5
 
 Metadata = Dict[str, Any]
 """Type alias representing metadata dictionaries carried by documents and chunks."""
@@ -73,3 +78,89 @@ class Node:
     def __repr__(self) -> str:  # pragma: no cover - cosmetic helper
         preview = self.text[:20].replace("\n", " ") + ("..." if len(self.text) > 20 else "")
         return f"Node(text='{preview}', metadata={self.metadata})"
+
+
+@dataclass(slots=True)
+class RetrievalResult:
+    """Represents the outcome of a similarity search operation."""
+
+    node_id: str
+    score: float
+    distance: float
+    metadata: Metadata
+    text: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a dictionary representation for backwards compatibility."""
+
+        return {
+            "node_id": self.node_id,
+            "score": self.score,
+            "distance": self.distance,
+            "metadata": self.metadata,
+            "document": self.text,
+        }
+
+
+@dataclass(slots=True)
+class StageTiming:
+    """Captures timing information for a pipeline stage."""
+
+    name: str
+    duration_ms: float
+
+
+@dataclass(slots=True)
+class ChunkerConfig:
+    """Configuration for document chunking behaviour."""
+
+    strategy: str = "sentence_overlap"
+    chunk_size: int = DEFAULT_CHUNK_SIZE
+    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP
+
+    def as_kwargs(self) -> Dict[str, Any]:
+        return {
+            "chunk_size": self.chunk_size,
+            "overlap": self.chunk_overlap,
+        }
+
+
+@dataclass(slots=True)
+class EmbeddingConfig:
+    """Configuration for embedding generation."""
+
+    model_name: str = "nomic-ai/nomic-embed-text-v1.5"
+    device: Optional[str] = None
+    batch_size: int = 8
+    normalize: bool = False
+
+
+@dataclass(slots=True)
+class VectorStoreConfig:
+    """Configuration for vector store selection and persistence."""
+
+    backend: str = "faiss"
+    index_path: str = "faiss_index.bin"
+    chroma_persist_dir: str = "chromadb"
+    metadata_path: Optional[str] = None
+
+
+@dataclass(slots=True)
+class RAGConfig:
+    """Top-level configuration object for the RAG pipeline."""
+
+    chunker: ChunkerConfig = field(default_factory=ChunkerConfig)
+    embeddings: EmbeddingConfig = field(default_factory=EmbeddingConfig)
+    vector_store: VectorStoreConfig = field(default_factory=VectorStoreConfig)
+    max_retrieval_docs: int = DEFAULT_MAX_RETRIEVAL_DOCS
+    persist_dir: Optional[str] = None
+
+    def with_chunker(self, **overrides: Any) -> "RAGConfig":
+        updated = self.chunker.__class__(**{**self.chunker.__dict__, **overrides})
+        return RAGConfig(
+            chunker=updated,
+            embeddings=self.embeddings,
+            vector_store=self.vector_store,
+            max_retrieval_docs=self.max_retrieval_docs,
+            persist_dir=self.persist_dir,
+        )
