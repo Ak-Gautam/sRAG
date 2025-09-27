@@ -1,43 +1,32 @@
-from pathlib import Path
-from typing import List, Dict, Optional, Any
-from dataclasses import dataclass
+from typing import List, Dict, Optional
 from abc import ABC, abstractmethod
-import spacy
 import re
-import nltk
 import logging
+import importlib
 
-from .doc_loader import Document
 from .exceptions import InvalidChunkSizeError, ZRAGError
+from .models import Document, Node
+
+# Optional heavy dependencies are loaded lazily and provide informative
+# error messages if missing. This prevents hard import failures for users
+# who only need non-token chunkers.
+_spacy_spec = importlib.util.find_spec("spacy")
+if _spacy_spec is None:  # pragma: no cover - environment dependent
+    spacy = None  # type: ignore[assignment]
+    _SPACY_IMPORT_ERROR = ModuleNotFoundError("No module named 'spacy'")
+else:  # pragma: no cover - import has side effects not needing tests
+    spacy = importlib.import_module("spacy")
+    _SPACY_IMPORT_ERROR = None
+
+_nltk_spec = importlib.util.find_spec("nltk")
+if _nltk_spec is None:  # pragma: no cover - environment dependent
+    nltk = None  # type: ignore[assignment]
+    _NLTK_IMPORT_ERROR = ModuleNotFoundError("No module named 'nltk'")
+else:  # pragma: no cover
+    nltk = importlib.import_module("nltk")
+    _NLTK_IMPORT_ERROR = None
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class Node:
-    """
-    Represents a single node containing a chunk of text and metadata.
-    
-    Attributes:
-        text: The text content of the node
-        metadata: Dictionary containing metadata about the node (document_id, indices, etc.)
-        embedding: Optional embedding vector for the text content
-    """
-    text: str
-    metadata: Dict[str, Any]
-    embedding: Optional[Any] = None
-
-    def __post_init__(self):
-        """Post-initialization processing."""
-        if not isinstance(self.text, str):
-            raise ValueError("Text must be a string")
-        self.text = self.text.strip()  # Remove leading/trailing spaces
-        
-        if not isinstance(self.metadata, dict):
-            raise ValueError("Metadata must be a dictionary")
-
-    def __repr__(self) -> str:
-        return f"Node(text='{self.text[:20]}...', metadata={self.metadata})"
 
 
 class ChunkSplitter(ABC):
@@ -129,6 +118,12 @@ class TokenChunkSplitter(ChunkSplitter):
             raise InvalidChunkSizeError(f"Chunk size must be positive, got {chunk_size}")
             
         self.chunk_size = chunk_size
+
+        if spacy is None:
+            raise ZRAGError(
+                "spaCy is required for token-based chunking. Install it with 'pip install spacy en-core-web-sm'",
+                details=str(_SPACY_IMPORT_ERROR),
+            )
         
         try:
             self.nlp = spacy.load("en_core_web_sm")  # Load a small English model
@@ -244,6 +239,12 @@ class SentenceChunkSplitterWithOverlap(ChunkSplitter):
             
         self.chunk_size = chunk_size
         self.overlap = overlap
+
+        if nltk is None:
+            raise ZRAGError(
+                "NLTK is required for sentence-based chunking. Install it with 'pip install nltk'",
+                details=str(_NLTK_IMPORT_ERROR),
+            )
         
         try:
             nltk.download('punkt', quiet=True)  # Download Punkt sentence tokenizer

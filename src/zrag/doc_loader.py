@@ -6,31 +6,14 @@ import datetime
 import markdown
 import mimetypes
 from pathlib import Path
-from typing import List, Dict, Optional, Callable, Union
+from typing import Callable, Dict, List, Optional
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
 
 from .exceptions import DocumentLoadError, UnsupportedFileFormatError
+from .models import Document
 
 # Configure logging
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class Document:
-    """Represents a single document with its content and metadata.
-    
-    Attributes:
-        document_id: Unique identifier for the document
-        metadata: Dictionary containing document metadata (file info, page info, etc.)
-        text: The actual text content of the document
-    """
-    document_id: str
-    metadata: Dict[str, str]
-    text: str
-
-    def __repr__(self) -> str:
-        return f"Document(document_id='{self.document_id}', metadata={self.metadata}, text='{self.text[:20]}...')"
 
 
 def _process_file(
@@ -244,7 +227,7 @@ class DocumentLoader:
                 })
 
                 document_id = str(uuid.uuid4())
-                documents.append(Document(document_id, metadata, text))
+                documents.append(Document(document_id=document_id, text=text, metadata=metadata))
         finally:
             doc.close()
             
@@ -375,7 +358,7 @@ class DocumentLoader:
                 'last_modified_date': datetime.datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d')
             }
             document_id = str(uuid.uuid4())
-            return Document(document_id, metadata, text)
+            return Document(document_id=document_id, text=text, metadata=metadata)
         except Exception as e:
             raise DocumentLoadError(f"Failed to create document metadata for {file_path}", details=str(e))
 
