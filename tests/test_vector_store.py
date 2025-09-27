@@ -13,17 +13,29 @@ from zrag.vector_store import VectorStore
 class TestVectorStore(unittest.TestCase):
     """Comprehensive tests for the VectorStore class."""
 
-    @patch("zrag.vector_store.faiss")
-    @patch("zrag.vector_store.chromadb")
-    def setUp(self, mock_chroma, mock_faiss):
+    def setUp(self):
         """Sets up mocks for FAISS and ChromaDB."""
-        self.mock_faiss = mock_faiss
-        self.mock_faiss.IndexFlatL2.return_value = MagicMock()
+
+        self.faiss_patcher = patch("zrag.vector_store.faiss")
+        self.chromadb_patcher = patch("zrag.vector_store.chromadb")
+
+        self.mock_faiss = self.faiss_patcher.start()
+        self.mock_chroma = self.chromadb_patcher.start()
+        self.addCleanup(self.faiss_patcher.stop)
+        self.addCleanup(self.chromadb_patcher.stop)
+
+        self.index_mock = MagicMock()
+        self.index_mock.add = MagicMock()
+        self.index_mock.search = MagicMock()
+        self.index_mock.d = 2
+        self.mock_faiss.IndexFlatL2.return_value = self.index_mock
         self.mock_faiss.write_index = MagicMock()
-        self.mock_chroma = mock_chroma
+        self.mock_faiss.read_index = MagicMock(return_value=MagicMock(ntotal=1))
+
         self.mock_chroma.PersistentClient.return_value = MagicMock()
         self.mock_collection = MagicMock()
         self.mock_chroma.PersistentClient.return_value.get_or_create_collection.return_value = self.mock_collection
+
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
 
@@ -52,7 +64,7 @@ class TestVectorStore(unittest.TestCase):
             Node("text1", embedding=np.array([0.1, 0.2])),
             Node("text2", embedding=np.array([0.3, 0.4])),
         ]
-        vs.index(chunks)
+        vs.add_documents(chunks)
         self.mock_faiss.IndexFlatL2.assert_called_once_with(2)
         self.mock_faiss.write_index.assert_called_once_with(vs.index, str(vs.index_path))
         self.assertEqual(len(vs._records), 2)
@@ -64,7 +76,7 @@ class TestVectorStore(unittest.TestCase):
             Node("text1", metadata={"node_id": "1"}, embedding=np.array([0.1, 0.2])),
             Node("text2", metadata={"node_id": "2"}, embedding=np.array([0.3, 0.4])),
         ]
-        vs.index(chunks)
+        vs.add_documents(chunks)
         vs.collection.add.assert_called_once_with(
             ids=["1", "2"],
             embeddings=[[0.1, 0.2], [0.3, 0.4]],
@@ -80,16 +92,21 @@ class TestVectorStore(unittest.TestCase):
             {"node_id": "n1", "metadata": {"k": "v1"}, "text": "doc1"},
             {"node_id": "n2", "metadata": {"k": "v2"}, "text": "doc2"},
         ]
+        vs._is_initialized = True
         vs.index.search.return_value = (
             np.array([[0.1, 0.2]], dtype="float32"),
             np.array([[0, 1]], dtype="int32"),
         )
         query_embedding = np.array([0.1, 0.2])
-        results = vs.search(query_embedding)
-        vs.index.search.assert_called_once_with(np.array([[0.1, 0.2]], dtype="float32"), 5)
+        results = vs.similarity_search(query_embedding)
+        self.assertEqual(vs.index.search.call_count, 1)
+        args, kwargs = vs.index.search.call_args
+        np.testing.assert_array_equal(args[0], np.array([[0.1, 0.2]], dtype="float32"))
+        self.assertEqual(args[1], 5)
+        self.assertFalse(kwargs)
         self.assertEqual(len(results), 2)
-        self.assertEqual(results[0]["node_id"], "n1")
-        self.assertAlmostEqual(results[0]["score"], 1 / (1 + 0.1))
+        self.assertEqual(results[0].node_id, "n1")
+        self.assertAlmostEqual(results[0].score, 1 / (1 + 0.1))
 
     def test_search_chroma(self):
         """Tests searching with ChromaDB."""
@@ -101,15 +118,15 @@ class TestVectorStore(unittest.TestCase):
             "documents": [["doc1", "doc2"]],
         }
         query_embedding = np.array([0.1, 0.2])
-        results = vs.search(query_embedding)
+        results = vs.similarity_search(query_embedding)
         vs.collection.query.assert_called_once_with(
             query_embeddings=[[0.1, 0.2]], n_results=5, include=["metadatas", "distances", "documents"]
         )
         self.assertEqual(len(results), 2)
-        self.assertEqual(results[0]["node_id"], "1")
-        self.assertEqual(results[0]["metadata"], {"key": "value1"})
-        self.assertEqual(results[0]["score"], 0.9)
-        self.assertEqual(results[0]["document"], "doc1")
+        self.assertEqual(results[0].node_id, "1")
+        self.assertEqual(results[0].metadata, {"key": "value1"})
+        self.assertEqual(results[0].score, 0.9)
+        self.assertEqual(results[0].text, "doc1")
 
     def test_save_faiss(self):
         """Tests saving the FAISS index."""
